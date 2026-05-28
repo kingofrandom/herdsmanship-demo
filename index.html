@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#006b34">
+<title>Herdsmanship Judge — Woodbury 2026</title>
+<style>
+  :root{
+    --green:#006b34; --green-d:#00532a; --green-l:#e6f2ea;
+    --ink:#13201a; --muted:#5d6b63; --line:#d7ddd8;
+    --bg:#f4f6f4; --card:#ffffff; --gold:#c8932a;
+    --danger:#b3261e; --warn:#9a6212; --warn-bg:#fff3e0;
+    --r:14px; --pad:16px; --tap:56px;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0; height:100%;}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,system-ui,sans-serif;
+    background:var(--bg); color:var(--ink);
+    font-size:17px; line-height:1.35;
+    -webkit-font-smoothing:antialiased;
+  }
+  .phone{
+    max-width:430px; margin:0 auto; min-height:100vh;
+    background:var(--bg); position:relative;
+    display:flex; flex-direction:column;
+    box-shadow:0 0 40px rgba(0,0,0,.08);
+  }
+  header{
+    background:var(--green); color:#fff; padding:13px var(--pad) 11px;
+    position:sticky; top:0; z-index:20;
+  }
+  .h-top{display:flex; justify-content:space-between; align-items:center; gap:10px;}
+  .h-title{font-weight:700; font-size:16px; letter-spacing:.2px;}
+  .h-sub{font-size:12px; opacity:.85; margin-top:1px;}
+  .chip{
+    background:rgba(255,255,255,.16); border:1px solid rgba(255,255,255,.28);
+    color:#fff; border-radius:999px; padding:6px 12px; font-size:13px; font-weight:600;
+    display:inline-flex; align-items:center; gap:6px; white-space:nowrap; cursor:pointer;
+  }
+  .h-context{display:flex; gap:7px; margin-top:10px; flex-wrap:wrap;}
+  .h-context .chip{flex:1; justify-content:center; font-size:12.5px;}
+  .dot{width:7px;height:7px;border-radius:50%;background:#8fe0a8;display:inline-block;}
+  .dot.off{background:#ffd28a;}
+  main{flex:1; padding:var(--pad); padding-bottom:96px;}
+  .view{display:none;}
+  .view.active{display:block; animation:fade .18s ease;}
+  @keyframes fade{from{opacity:0; transform:translateY(4px);} to{opacity:1; transform:none;}}
+  h2.sec{font-size:12.5px; text-transform:uppercase; letter-spacing:.7px; color:var(--muted); margin:6px 2px 10px; font-weight:700; display:flex; justify-content:space-between; align-items:center;}
+  h2.sec .right{color:var(--ink); font-size:12.5px;}
+  .species-bar{display:flex; gap:8px; overflow-x:auto; padding:2px 2px 12px; margin:0 -2px; scrollbar-width:none;}
+  .species-bar::-webkit-scrollbar{display:none;}
+  .sp{flex-shrink:0; background:var(--card); border:1.5px solid var(--line); border-radius:999px; padding:9px 14px 9px 12px; font-weight:700; font-size:14px; color:var(--ink); cursor:pointer; display:flex; align-items:center; gap:7px;}
+  .sp .em{font-size:17px;}
+  .sp .ct{background:var(--bg); color:var(--muted); font-size:11.5px; padding:2px 7px; border-radius:999px; font-weight:700;}
+  .sp.on{background:var(--green); border-color:var(--green); color:#fff;}
+  .sp.on .ct{background:rgba(255,255,255,.22); color:#fff;}
+  .club{background:var(--card); border:1px solid var(--line); border-radius:var(--r); padding:14px 15px; margin-bottom:10px; display:flex; align-items:center; gap:13px; cursor:pointer; transition:transform .08s;}
+  .club:active{transform:scale(.985);}
+  .club .badge{width:44px;height:44px;border-radius:11px;background:var(--green-l);color:var(--green-d);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;flex-shrink:0;}
+  .club .meta{flex:1; min-width:0;}
+  .club .name{font-weight:700; font-size:16px; line-height:1.25;}
+  .club .loc{font-size:12.5px; color:var(--muted); margin-top:2px;}
+  .club .stat{text-align:right; flex-shrink:0;}
+  .pill{font-size:12px; font-weight:700; padding:5px 10px; border-radius:999px; white-space:nowrap; display:inline-block;}
+  .pill.done{background:var(--green-l); color:var(--green-d);}
+  .pill.todo{background:var(--warn-bg); color:var(--warn);}
+  .pill .sc{font-size:14.5px;}
+  .club .arrow{color:var(--line); font-size:22px;}
+  .empty{text-align:center; color:var(--muted); padding:48px 20px;}
+  .empty .big{font-size:40px; margin-bottom:8px;}
+  .sheet-head{background:var(--card); border:1px solid var(--line); border-radius:var(--r); padding:13px 15px; margin-bottom:13px; display:flex; align-items:center; justify-content:space-between; gap:10px;}
+  .sheet-head .nm{font-weight:800; font-size:18px; line-height:1.2;}
+  .sheet-head .sub{font-size:12.5px; color:var(--muted); margin-top:3px;}
+  .live{text-align:center; background:var(--green); color:#fff; border-radius:12px; padding:8px 12px; min-width:78px; flex-shrink:0;}
+  .live .n{font-size:24px; font-weight:800; line-height:1;}
+  .live .l{font-size:10px; text-transform:uppercase; letter-spacing:.6px; opacity:.85; margin-top:3px;}
+  .cat{background:var(--card); border:1px solid var(--line); border-radius:var(--r); padding:13px 14px 14px; margin-bottom:10px;}
+  .cat-top{display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:9px; gap:10px;}
+  .cat-name{font-weight:700; font-size:15px; line-height:1.25;}
+  .cat-wt{background:var(--green-l); color:var(--green-d); font-weight:800; font-size:11.5px; padding:3px 9px; border-radius:7px; white-space:nowrap; flex-shrink:0; margin-top:1px;}
+  .cat-hint{font-size:12px; color:var(--muted); margin-top:-3px; margin-bottom:9px; line-height:1.35;}
+  .rate{display:grid; grid-template-columns:repeat(5,1fr); gap:7px;}
+  .rate button{height:var(--tap); border:2px solid var(--line); background:#fff; border-radius:12px; font-size:19px; font-weight:800; color:var(--muted); cursor:pointer; transition:all .1s; display:flex;align-items:center;justify-content:center;}
+  .rate button:active{transform:scale(.94);}
+  .rate button.sel{background:var(--green); border-color:var(--green); color:#fff; box-shadow:0 3px 10px rgba(0,107,52,.3);}
+  .legend{display:flex; justify-content:space-between; font-size:10px; color:var(--muted); margin-top:6px; padding:0 2px;}
+  .note-wrap{margin-bottom:14px;}
+  .note-lbl{display:flex; justify-content:space-between; align-items:center; margin-bottom:7px;}
+  .note-lbl span{font-weight:700; font-size:14px;}
+  .note-lbl small{color:var(--muted); font-weight:500;}
+  .mic{background:var(--green-l); color:var(--green-d); border:none; border-radius:999px; padding:6px 13px; font-size:13px; font-weight:700; cursor:pointer;}
+  textarea{width:100%; min-height:72px; border:1px solid var(--line); border-radius:12px; padding:11px; font:inherit; font-size:15px; resize:vertical; background:#fff;}
+  .quick-notes{display:flex; flex-wrap:wrap; gap:7px; margin-top:9px;}
+  .qn{background:#fff; border:1px solid var(--line); border-radius:999px; padding:7px 12px; font-size:13px; cursor:pointer; color:var(--ink);}
+  .qn:active{background:var(--green-l);}
+  .photo-row{display:flex; gap:10px; margin-bottom:16px;}
+  .photo-btn{flex:1; height:50px; border:1.5px dashed var(--line); border-radius:12px; background:#fff; display:flex; align-items:center; justify-content:center; gap:8px; font-weight:700; color:var(--muted); cursor:pointer; font-size:14px;}
+  .save-bar{display:flex; gap:10px;}
+  .btn{flex:1; height:56px; border:none; border-radius:14px; font-size:16.5px; font-weight:800; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:7px;}
+  .btn.primary{background:var(--green); color:#fff; box-shadow:0 4px 14px rgba(0,107,52,.28);}
+  .btn.primary:active{transform:scale(.98);}
+  .btn.ghost{background:#fff; border:1.5px solid var(--line); color:var(--ink); flex:0 0 88px;}
+  .results-toggle{display:flex; background:var(--card); border:1px solid var(--line); border-radius:12px; padding:3px; gap:3px; margin-bottom:14px;}
+  .results-toggle button{flex:1; border:none; background:transparent; padding:10px; border-radius:9px; font-weight:700; font-size:13.5px; color:var(--muted); cursor:pointer;}
+  .results-toggle button.on{background:var(--green); color:#fff;}
+  .rank{background:var(--card); border:1px solid var(--line); border-radius:var(--r); padding:13px 14px; margin-bottom:9px; display:flex; align-items:center; gap:12px; cursor:pointer;}
+  .rank .pos{width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;background:var(--bg);color:var(--muted);flex-shrink:0;}
+  .rank.gold .pos{background:var(--gold);color:#fff;}
+  .rank.silver .pos{background:#9aa3a8;color:#fff;}
+  .rank.bronze .pos{background:#b07a45;color:#fff;}
+  .rank .meta{flex:1; min-width:0;}
+  .rank .name{font-weight:700; font-size:15.5px; line-height:1.25;}
+  .rank .passes{font-size:12px; color:var(--muted); margin-top:2px;}
+  .rank .score{font-size:22px; font-weight:800; color:var(--green-d); flex-shrink:0;}
+  .rank .score small{font-size:11px; color:var(--muted); font-weight:600;}
+  .ineligible{opacity:.55;}
+  .ineligible .pos{background:var(--bg)!important; color:var(--muted)!important;}
+  .premium-row{background:linear-gradient(180deg,#fff7e6 0%,#fff 100%); border:1px solid #ecd9a5; border-radius:var(--r); padding:13px 15px; margin-bottom:14px;}
+  .premium-row .lbl{font-size:12px; text-transform:uppercase; letter-spacing:.7px; color:var(--warn); font-weight:700;}
+  .premium-row .desc{font-size:13.5px; color:var(--muted); margin-top:5px; line-height:1.4;}
+  .detail-pass{background:var(--card); border:1px solid var(--line); border-radius:var(--r); padding:11px 13px; margin-bottom:8px;}
+  .detail-pass .dp-top{display:flex; justify-content:space-between; align-items:center;}
+  .detail-pass .dp-name{font-weight:700; font-size:14px;}
+  .detail-pass .dp-score{font-weight:800; color:var(--green-d); font-size:15px;}
+  .detail-pass .dp-note{font-size:13px; color:var(--muted); margin-top:5px; font-style:italic; line-height:1.4;}
+  .panel{background:var(--card); border:1px solid var(--line); border-radius:var(--r); padding:6px 15px; margin-bottom:13px;}
+  .row{display:flex; justify-content:space-between; align-items:center; padding:13px 0; border-bottom:1px solid var(--line); gap:10px;}
+  .row:last-child{border-bottom:none;}
+  .row .lab{font-weight:600; font-size:14.5px;}
+  .row .val{color:var(--muted); display:flex; align-items:center; gap:7px;}
+  .seg{display:flex; background:var(--bg); border-radius:10px; padding:3px; gap:3px; flex-wrap:wrap;}
+  .seg button{border:none; background:transparent; padding:7px 11px; border-radius:8px; font-weight:700; font-size:13px; color:var(--muted); cursor:pointer; white-space:nowrap;}
+  .seg button.on{background:#fff; color:var(--green-d); box-shadow:0 1px 3px rgba(0,0,0,.12);}
+  .rubric-row{display:flex; justify-content:space-between; align-items:center; padding:12px 0; border-bottom:1px solid var(--line); gap:10px;}
+  .rubric-row:last-child{border-bottom:none;}
+  .rubric-row .rn{font-weight:600; font-size:14px;}
+  .rubric-row .rw{background:var(--green-l); color:var(--green-d); font-weight:800; font-size:12px; padding:3px 9px; border-radius:7px;}
+  .hint{font-size:12.5px; color:var(--muted); padding:10px 2px 0; line-height:1.45;}
+  .fb-sheet{background:#fff; border:1px solid var(--line); border-radius:var(--r); padding:18px; margin-bottom:14px;}
+  .fb-head{border-bottom:2px solid var(--green); padding-bottom:10px; margin-bottom:14px;}
+  .fb-head h3{margin:0; font-size:17px; color:var(--green-d);}
+  .fb-head .fb-sub{font-size:12.5px; color:var(--muted); margin-top:3px;}
+  .fb-cat{padding:8px 0; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; align-items:baseline; gap:10px;}
+  .fb-cat:last-of-type{border-bottom:none;}
+  .fb-cat .fc-n{font-weight:600; font-size:13.5px;}
+  .fb-cat .fc-s{font-weight:800; font-size:14px; color:var(--green-d); white-space:nowrap;}
+  .fb-total{margin-top:10px; padding-top:10px; border-top:2px solid var(--green); display:flex; justify-content:space-between; font-weight:800; font-size:16px;}
+  .fb-note{margin-top:14px; padding:11px 13px; background:var(--green-l); border-radius:10px; font-size:13px; line-height:1.45; color:var(--ink);}
+  nav{position:fixed; bottom:0; left:50%; transform:translateX(-50%); width:100%; max-width:430px; background:#fff; border-top:1px solid var(--line); display:flex; z-index:30; padding-bottom:env(safe-area-inset-bottom);}
+  nav button{flex:1; background:none; border:none; padding:10px 0 12px; cursor:pointer; color:var(--muted); font-size:11px; font-weight:700; display:flex; flex-direction:column; align-items:center; gap:4px;}
+  nav button .ic{font-size:21px; line-height:1;}
+  nav button.on{color:var(--green);}
+  .toast{position:fixed; bottom:88px; left:50%; transform:translateX(-50%) translateY(20px); background:var(--ink); color:#fff; padding:12px 18px; border-radius:12px; font-weight:600; font-size:14.5px; opacity:0; pointer-events:none; transition:all .25s; z-index:50; white-space:nowrap; box-shadow:0 8px 24px rgba(0,0,0,.25); display:flex; align-items:center; gap:8px;}
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+  .offline-banner{background:var(--warn-bg); color:var(--warn); font-size:12px; font-weight:600; text-align:center; padding:5px; border-bottom:1px solid #f0deb8;}
+  .demo-banner{background:#fef9e6; color:#7a5a00; font-size:12.5px; text-align:center; padding:8px 12px; border-bottom:1px solid #f0deb8; line-height:1.35;}
+  .demo-banner b{color:#5a4400;}
+  @media print {
+    nav, header, .save-bar, .photo-row, .note-wrap, .toast, .demo-banner { display:none !important; }
+    .phone { box-shadow:none; max-width:100%; }
+    main { padding-bottom:0 !important; }
+    .fb-sheet { page-break-inside:avoid; }
+  }
+</style>
+</head>
+<body>
+<div class="phone">
+
+  <header>
+    <div class="h-top">
+      <div>
+        <div class="h-title">Herdsmanship · Woodbury 2026</div>
+        <div class="h-sub">Supt: Jamie Johnson · 712-253-3336</div>
+      </div>
+      <span class="chip" onclick="bumpOffline()"><span class="dot" id="syncDot"></span><span id="syncTxt">Saved</span></span>
+    </div>
+    <div class="h-context">
+      <span class="chip" onclick="go('setup')">👤 <span id="judgeName">Pat M.</span></span>
+      <span class="chip" onclick="go('setup')">📅 <span id="dayName">Day 2 · PM</span></span>
+    </div>
+  </header>
+  <div class="demo-banner"><b>Prototype</b> — tap around freely. Camera, voice, and export are placeholders; scoring, results, and the feedback sheet are fully working.</div>
+  <div class="offline-banner" id="offBanner" style="display:none;">⚠ Offline — scores saved on this phone, will sync when signal returns</div>
+
+  <main>
+    <section class="view active" id="view-score">
+      <h2 class="sec"><span>Pick a barn / species</span><span class="right" id="progressTxt">—</span></h2>
+      <div class="species-bar" id="speciesBar"></div>
+      <h2 class="sec"><span id="speciesLabel">Clubs to score</span></h2>
+      <div id="clubList"></div>
+    </section>
+
+    <section class="view" id="view-sheet">
+      <div class="sheet-head">
+        <div>
+          <div class="nm" id="sheetName">—</div>
+          <div class="sub" id="sheetSub">—</div>
+        </div>
+        <div class="live"><div class="n" id="liveScore">0</div><div class="l">/ 100</div></div>
+      </div>
+      <div id="catList"></div>
+      <div class="note-wrap">
+        <div class="note-lbl">
+          <span>Judge note <small>(shared with club)</small></span>
+          <button class="mic" onclick="toast('🎤 Voice-to-text (demo)')">🎤 Dictate</button>
+        </div>
+        <textarea id="noteBox" placeholder="e.g. Bedding dry &amp; in place, animals well groomed. Stall cards missing exhibitor names — please add before next inspection."></textarea>
+        <div class="quick-notes" id="quickNotes"></div>
+      </div>
+      <div class="photo-row">
+        <button class="photo-btn" onclick="toast('📷 Camera (demo)')">📷 Add Photo</button>
+        <button class="photo-btn" onclick="toast('📷 Camera (demo)')">📷 Add Photo</button>
+      </div>
+      <div class="save-bar">
+        <button class="btn ghost" onclick="go('score')">Cancel</button>
+        <button class="btn primary" onclick="saveSheet()">✓ Save Score</button>
+      </div>
+    </section>
+
+    <section class="view" id="view-results">
+      <div class="results-toggle">
+        <button id="rt-overall" class="on" onclick="setResultsMode('overall')">Overall standings</button>
+        <button id="rt-today" onclick="setResultsMode('today')">Today</button>
+      </div>
+      <div class="premium-row">
+        <div class="lbl">🏆 Premium-eligible clubs</div>
+        <div class="desc">Clubs exhibiting in <b>4+ species</b> are eligible for premiums (1st $25 · 2nd $20 · 3rd $10) and choice of stalling next year.</div>
+      </div>
+      <h2 class="sec"><span id="resultsLabel">Overall · all inspections</span></h2>
+      <div id="rankList"></div>
+      <div class="hint">Tap a club for the per-species breakdown, judge notes, and a printable feedback sheet to share with leaders.</div>
+      <button class="btn primary" style="margin-top:14px;" onclick="toast('📄 Exported woodbury_2026_results.csv (demo)')">📄 Export Final Results</button>
+    </section>
+
+    <section class="view" id="view-detail">
+      <div class="sheet-head">
+        <div><div class="nm" id="detName">—</div><div class="sub" id="detSub">—</div></div>
+        <div class="live"><div class="n" id="detScore">0</div><div class="l">total</div></div>
+      </div>
+      <h2 class="sec"><span>Per-species inspections</span></h2>
+      <div id="detPasses"></div>
+      <h2 class="sec"><span>Printable feedback sheet</span></h2>
+      <div id="feedbackSheet"></div>
+      <div class="save-bar" style="margin-top:6px;">
+        <button class="btn ghost" onclick="go('results')">← Back</button>
+        <button class="btn primary" onclick="window.print()">🖨 Print / Share</button>
+      </div>
+    </section>
+
+    <section class="view" id="view-setup">
+      <h2 class="sec"><span>This session</span></h2>
+      <div class="panel">
+        <div class="row"><span class="lab">Judge</span>
+          <div class="seg" id="judgeSeg"></div></div>
+        <div class="row"><span class="lab">Inspection</span>
+          <div class="seg" id="passSeg"></div></div>
+      </div>
+      <h2 class="sec"><span>Rubric · 100 pts</span><span class="right">Woodbury 2026</span></h2>
+      <div class="panel" id="rubricPanel"></div>
+      <div class="hint">Source: Woodbury County Fair book, p.45. Inspected twice daily; daily scoring on all species combined for daily total. Final placings = sum across all inspection days.</div>
+      <h2 class="sec"><span>Demo</span></h2>
+      <div class="panel">
+        <div class="row" onclick="resetDemo()"><span class="lab" style="color:var(--danger)">Reset demo data</span><span class="val">↺</span></div>
+      </div>
+    </section>
+  </main>
+
+  <nav>
+    <button id="nav-score" class="on" onclick="go('score')"><span class="ic">📋</span>Score</button>
+    <button id="nav-results" onclick="go('results')"><span class="ic">🏆</span>Results</button>
+    <button id="nav-setup" onclick="go('setup')"><span class="ic">⚙️</span>Setup</button>
+  </nav>
+  <div class="toast" id="toast"></div>
+</div>
+
+<script>
+const RUBRIC = [
+  {key:"clean",   name:"Cleanliness of Alleys & Stalls/Pens", wt:20,
+    hint:"Bedding adequate, bright, dry, clean and in place. Manure hauled out. Alleys swept clean, free of dust/straw, clear of tack boxes."},
+  {key:"animals", name:"Appearance of Animals", wt:20,
+    hint:"Animals clean with grooming apparent."},
+  {key:"security",name:"Security of Animals", wt:15,
+    hint:"Double-tied animals, gates across back of stalls, padlocks on rabbit & poultry cages."},
+  {key:"educ",    name:"Educational Effect / Stall Cards", wt:15,
+    hint:"Each animal & exhibit identified by a stall card. Cards display exhibitor name, club name, etc."},
+  {key:"feed",    name:"Adequate Feed & Water", wt:10,
+    hint:"Suitable feed in clean dish; reasonable access to clean, fresh water in a sanitary manner."},
+  {key:"exhib",   name:"Exhibitors — Conduct & Cooperation", wt:20,
+    hint:"Courtesy, conduct, attitude and cooperation of exhibitors between all species."},
+];
+
+const JUDGES = ["Pat M.","Dana R.","Sam K.","Jamie J."];
+const PASSES = [
+  {id:"d1am", label:"Day 1 · AM"},
+  {id:"d1pm", label:"Day 1 · PM"},
+  {id:"d2am", label:"Day 2 · AM"},
+  {id:"d2pm", label:"Day 2 · PM"},
+  {id:"d3am", label:"Day 3 · AM"},
+  {id:"d3pm", label:"Day 3 · PM"},
+];
+const QUICK = ["Bedding dry & clean","Stall cards incomplete","Refill water","Excellent grooming","Aisle blocked","Manure not hauled","Great cooperation","Animals not secured"];
+const SPECIES = [
+  {id:"beef",   name:"Beef Cattle", em:"🐄"},
+  {id:"sheep",  name:"Sheep",       em:"🐑"},
+  {id:"swine",  name:"Swine",       em:"🐖"},
+  {id:"dairy",  name:"Dairy",       em:"🥛"},
+  {id:"goat",   name:"Goat",        em:"🐐"},
+  {id:"horse",  name:"Horse",       em:"🐴"},
+  {id:"rabbit", name:"Rabbit",      em:"🐇"},
+  {id:"poultry",name:"Poultry",     em:"🐓"},
+];
+const CLUBS = [
+  {id:"anthon",   name:"Anthon Advancers",         species:["beef","sheep","swine","goat"]},
+  {id:"arlington",name:"Arlington Future Farmers", species:["beef","swine","dairy"]},
+  {id:"banner",   name:"Banner Boosters",          species:["sheep","goat","rabbit"]},
+  {id:"bgh",      name:"Boys & Girls Home",        species:["rabbit","poultry"]},
+  {id:"bronson",  name:"Bronson Rustlers",         species:["beef","sheep","swine","dairy","goat","horse"]},
+  {id:"bryant",   name:"Bryant 4-H Club",          species:["beef","swine","poultry"]},
+  {id:"goodluck", name:"Good Luck Clovers",        species:["sheep","goat","rabbit","poultry"]},
+  {id:"grant",    name:"Grant-Go-Getters",         species:["beef","swine"]},
+  {id:"loess",    name:"Loess Hills 4-H Club",     species:["horse","goat"]},
+  {id:"lucky",    name:"Lucky Lassies & Lads",     species:["beef","sheep","horse"]},
+  {id:"pierson",  name:"Pierson 4-H Club",         species:["beef","sheep","swine","poultry"]},
+  {id:"pioneer",  name:"Pioneer Valley",           species:["dairy","goat"]},
+  {id:"rockbr",   name:"Rock Branch Producers",    species:["beef","swine"]},
+  {id:"rockkee",  name:"Rock-Kee-Union",           species:["sheep","swine","goat"]},
+  {id:"sunday",   name:"Sunday Funday",            species:["rabbit","poultry"]},
+  {id:"willow",   name:"Willow Workers",           species:["beef","dairy","goat","horse","poultry"]},
+  {id:"innov",    name:"Woodbury Innovators",      species:["swine","rabbit"]},
+];
+
+const LS="hsm_woodbury_v2";
+let S = load();
+let activeSpecies = "beef";
+let currentClub = null, currentSpecies = null;
+let draft = {};
+let resultsMode = "overall";
+
+function load(){
+  try{ const v=JSON.parse(localStorage.getItem(LS)); if(v) return v; }catch(e){}
+  const s = {judge:"Pat M.", pass:"d2pm", scores:{}};
+  let _r=12345; const rand=()=>{ _r=(_r*9301+49297)%233280; return _r/233280; };
+  const rgen = (seed)=>{ let x=seed; return ()=>{ x=(x*9301+49297)%233280; return 3 + (x % 3); }; };
+  const notes = [
+    "Spotless pens, animals well groomed. Best display in the barn.",
+    "Water buckets low. Tidy feed bags along back wall.",
+    "Nice improvement from yesterday. Aisle clear.",
+    "Solid all around. Add club banner for display points.",
+    "Outstanding signage and feed organization.",
+    "Stall cards missing exhibitor names — please add.",
+    "Members courteous and helpful with visitors.",
+  ];
+  const seedPass = (passId, fillRatio, seedBase) => {
+    CLUBS.forEach((c,ci)=>{
+      c.species.forEach((sp,si)=>{
+        if(rand() > fillRatio) return;
+        const r = rgen(seedBase + ci*7 + si*3);
+        const ratings = {}; RUBRIC.forEach(cat => ratings[cat.key] = r());
+        s.scores[`${c.id}|${sp}|${passId}`] = {r:ratings, note:notes[(ci+si)%notes.length]};
+      });
+    });
+  };
+  seedPass("d1am", 1.0, 100);
+  seedPass("d1pm", 0.85, 200);
+  seedPass("d2am", 0.55, 300);
+  return s;
+}
+function save(){ localStorage.setItem(LS, JSON.stringify(S)); flashSaved(); }
+
+function calc(r){
+  if(!r) return 0;
+  let t=0; RUBRIC.forEach(c=> t += ((r[c.key]||0)/5)*c.wt);
+  return Math.round(t);
+}
+function clubSpeciesScores(clubId, sp){
+  return PASSES.map(p=>{
+    const e = S.scores[`${clubId}|${sp}|${p.id}`];
+    return e ? {pass:p, score:calc(e.r), note:e.note, r:e.r} : null;
+  }).filter(Boolean);
+}
+function clubTotal(clubId){
+  const club = CLUBS.find(c=>c.id===clubId);
+  let total=0, n=0;
+  club.species.forEach(sp=>{
+    clubSpeciesScores(clubId, sp).forEach(s=>{ total += s.score; n++; });
+  });
+  return {total, n, speciesCount: club.species.length};
+}
+function clubPassTotal(clubId, passId){
+  const club = CLUBS.find(c=>c.id===clubId);
+  let total=0, n=0;
+  club.species.forEach(sp=>{
+    const e = S.scores[`${clubId}|${sp}|${passId}`];
+    if(e){ total += calc(e.r); n++; }
+  });
+  return {total, n, speciesCount: club.species.length};
+}
+function passLabel(id){ return PASSES.find(p=>p.id===id)?.label || id; }
+
+function go(v){
+  document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
+  document.getElementById('view-'+v).classList.add('active');
+  ['score','results','setup'].forEach(n=>{
+    const b=document.getElementById('nav-'+n); if(b) b.classList.toggle('on', n===v ||
+      (v==='sheet'&&n==='score') || (v==='detail'&&n==='results'));
+  });
+  if(v==='score') renderScore();
+  if(v==='results') renderResults();
+  if(v==='setup') renderSetup();
+  window.scrollTo(0,0);
+}
+
+function clubsForSpecies(sp){ return CLUBS.filter(c => c.species.includes(sp)); }
+function renderScore(){
+  const sb = document.getElementById('speciesBar'); sb.innerHTML='';
+  SPECIES.forEach(sp=>{
+    const clubs = clubsForSpecies(sp.id);
+    if(!clubs.length) return;
+    const remaining = clubs.filter(c => !S.scores[`${c.id}|${sp.id}|${S.pass}`]).length;
+    const el = document.createElement('div');
+    el.className = 'sp' + (sp.id===activeSpecies?' on':'');
+    el.innerHTML = `<span class="em">${sp.em}</span> ${sp.name} <span class="ct">${remaining||'✓'}</span>`;
+    el.onclick = ()=>{ activeSpecies = sp.id; renderScore(); };
+    sb.appendChild(el);
+  });
+  const allClubsAllSpecies = CLUBS.reduce((acc,c)=>acc+c.species.length,0);
+  const doneThisPass = CLUBS.reduce((acc,c)=>acc + c.species.filter(sp=>S.scores[`${c.id}|${sp}|${S.pass}`]).length, 0);
+  document.getElementById('progressTxt').textContent = `${doneThisPass}/${allClubsAllSpecies} scored`;
+  const spDef = SPECIES.find(x=>x.id===activeSpecies);
+  document.getElementById('speciesLabel').textContent = `${spDef.em} ${spDef.name} · ${passLabel(S.pass)}`;
+  const list = document.getElementById('clubList'); list.innerHTML='';
+  const clubs = clubsForSpecies(activeSpecies);
+  if(!clubs.length){
+    list.innerHTML = `<div class="empty"><div class="big">🌾</div>No clubs exhibiting ${spDef.name} this year.</div>`;
+    return;
+  }
+  clubs.forEach(c=>{
+    const e = S.scores[`${c.id}|${activeSpecies}|${S.pass}`];
+    const done = !!e; const sc = done?calc(e.r):null;
+    const init = c.name.split(/\s+/).slice(0,2).map(w=>w[0]).join('').toUpperCase();
+    const d = document.createElement('div'); d.className='club';
+    d.onclick = ()=>openSheet(c.id, activeSpecies);
+    d.innerHTML = `
+      <div class="badge">${init}</div>
+      <div class="meta"><div class="name">${c.name}</div><div class="loc">${spDef.em} ${spDef.name} barn · ${c.species.length} species exhibited</div></div>
+      <div class="stat">${done
+        ? `<span class="pill done"><span class="sc">${sc}</span>/100 ✓</span>`
+        : `<span class="pill todo">Not scored</span>`}</div>
+      <div class="arrow">›</div>`;
+    list.appendChild(d);
+  });
+}
+
+function openSheet(clubId, sp){
+  currentClub = clubId; currentSpecies = sp;
+  const c = CLUBS.find(x=>x.id===clubId);
+  const spDef = SPECIES.find(x=>x.id===sp);
+  const key = `${clubId}|${sp}|${S.pass}`;
+  const e = S.scores[key];
+  document.getElementById('sheetName').textContent = c.name;
+  document.getElementById('sheetSub').textContent = `${spDef.em} ${spDef.name} · ${passLabel(S.pass)} · ${S.judge}`;
+  const ratings = e? {...e.r} : {};
+  document.getElementById('noteBox').value = e? (e.note||'') : '';
+  const cl = document.getElementById('catList'); cl.innerHTML='';
+  RUBRIC.forEach(cat=>{
+    const wrap = document.createElement('div'); wrap.className='cat';
+    let btns='';
+    for(let i=1;i<=5;i++) btns += `<button data-k="${cat.key}" data-v="${i}" class="${ratings[cat.key]===i?'sel':''}" onclick="pick('${cat.key}',${i})">${i}</button>`;
+    wrap.innerHTML = `
+      <div class="cat-top"><span class="cat-name">${cat.name}</span><span class="cat-wt">${cat.wt} pts</span></div>
+      <div class="cat-hint">${cat.hint}</div>
+      <div class="rate">${btns}</div>
+      <div class="legend"><span>Poor</span><span>Fair</span><span>Good</span><span>Very good</span><span>Excellent</span></div>`;
+    cl.appendChild(wrap);
+  });
+  const qn = document.getElementById('quickNotes'); qn.innerHTML='';
+  QUICK.forEach(q=>{ const b=document.createElement('button'); b.className='qn'; b.textContent='+ '+q;
+    b.onclick=()=>{ const t=document.getElementById('noteBox'); t.value=(t.value?t.value.trim()+' ':'')+q+'.'; };
+    qn.appendChild(b); });
+  draft = {...ratings};
+  updateLive();
+  go('sheet');
+}
+function pick(k,v){
+  draft[k]=v; updateLive();
+  document.querySelectorAll(`.rate button[data-k="${k}"]`).forEach(b=>{
+    b.classList.toggle('sel', +b.dataset.v===v);
+  });
+}
+function updateLive(){ document.getElementById('liveScore').textContent = calc(draft); }
+function saveSheet(){
+  const complete = RUBRIC.every(c=>draft[c.key]);
+  if(!complete){ toast('⚠ Score every category first'); return; }
+  S.scores[`${currentClub}|${currentSpecies}|${S.pass}`] = {r:{...draft}, note:document.getElementById('noteBox').value.trim()};
+  save();
+  const c = CLUBS.find(x=>x.id===currentClub);
+  toast(`✓ ${c.name} — ${calc(draft)}/100 saved`);
+  setTimeout(()=>go('score'),350);
+}
+
+function setResultsMode(m){ resultsMode=m; document.getElementById('rt-overall').classList.toggle('on', m==='overall'); document.getElementById('rt-today').classList.toggle('on', m==='today'); renderResults(); }
+function renderResults(){
+  document.getElementById('resultsLabel').textContent =
+    resultsMode==='overall' ? 'Overall · all inspections so far' : `Today · ${passLabel(S.pass)}`;
+  const rows = CLUBS.map(c=>{
+    const t = resultsMode==='overall' ? clubTotal(c.id) : clubPassTotal(c.id, S.pass);
+    return {c, ...t};
+  }).filter(r=>r.n>0).sort((a,b)=>b.total-a.total);
+
+  const el = document.getElementById('rankList'); el.innerHTML='';
+  if(!rows.length){ el.innerHTML = `<div class="empty"><div class="big">📋</div>No scores recorded yet for this view.</div>`; return; }
+
+  const eligibleRanked = rows.filter(r=>r.speciesCount>=4);
+  const medalIds = eligibleRanked.slice(0,3).map(r=>r.c.id);
+  const medal = ['gold','silver','bronze'];
+
+  rows.forEach((row,i)=>{
+    const eligible = row.speciesCount>=4;
+    const medalIdx = medalIds.indexOf(row.c.id);
+    const d = document.createElement('div');
+    d.className = 'rank ' + (medalIdx>=0 ? medal[medalIdx] : '') + (eligible?'':' ineligible');
+    d.onclick = ()=>openDetail(row.c.id);
+    const tag = eligible
+      ? `${row.n} inspection${row.n>1?'s':''} · ${row.speciesCount} species`
+      : `${row.n} inspection${row.n>1?'s':''} · ${row.speciesCount} species (not premium-eligible)`;
+    d.innerHTML = `
+      <div class="pos">${i+1}</div>
+      <div class="meta">
+        <div class="name">${row.c.name}</div>
+        <div class="passes">${tag}</div>
+      </div>
+      <div class="score">${row.total}<small> pts</small></div>`;
+    el.appendChild(d);
+  });
+}
+
+function openDetail(clubId){
+  const c = CLUBS.find(x=>x.id===clubId);
+  const agg = clubTotal(clubId);
+  document.getElementById('detName').textContent = c.name;
+  document.getElementById('detSub').textContent = `${c.species.length} species · ${agg.n} inspections${agg.speciesCount>=4?' · premium-eligible':' · not premium-eligible (need 4+ species)'}`;
+  document.getElementById('detScore').textContent = agg.total;
+  const el = document.getElementById('detPasses'); el.innerHTML='';
+  c.species.forEach(sp=>{
+    const spDef = SPECIES.find(x=>x.id===sp);
+    const scores = clubSpeciesScores(clubId, sp);
+    if(!scores.length){
+      const d = document.createElement('div'); d.className='detail-pass';
+      d.innerHTML = `<div class="dp-top"><span class="dp-name">${spDef.em} ${spDef.name}</span><span class="dp-score" style="color:var(--muted)">— not yet inspected</span></div>`;
+      el.appendChild(d); return;
+    }
+    scores.forEach(sc=>{
+      const d = document.createElement('div'); d.className='detail-pass';
+      d.innerHTML = `
+        <div class="dp-top"><span class="dp-name">${spDef.em} ${spDef.name} · ${sc.pass.label}</span><span class="dp-score">${sc.score}/100</span></div>
+        ${sc.note?`<div class="dp-note">"${sc.note}"</div>`:''}`;
+      el.appendChild(d);
+    });
+  });
+  renderFeedbackSheet(clubId);
+}
+function renderFeedbackSheet(clubId){
+  const c = CLUBS.find(x=>x.id===clubId);
+  const el = document.getElementById('feedbackSheet'); el.innerHTML='';
+  const sums = {}; const counts = {};
+  RUBRIC.forEach(r=>{ sums[r.key]=0; counts[r.key]=0; });
+  let allNotes = [];
+  c.species.forEach(sp=>{
+    PASSES.forEach(p=>{
+      const e = S.scores[`${c.id}|${sp}|${p.id}`]; if(!e) return;
+      RUBRIC.forEach(r=>{ if(e.r[r.key]){ sums[r.key]+=e.r[r.key]; counts[r.key]++; } });
+      if(e.note) allNotes.push(`${SPECIES.find(x=>x.id===sp).name} · ${p.label}: ${e.note}`);
+    });
+  });
+  if(Object.values(counts).every(v=>v===0)){
+    el.innerHTML = `<div class="empty"><div class="big">📝</div>No inspections recorded yet.</div>`;
+    return;
+  }
+  const sheet = document.createElement('div'); sheet.className='fb-sheet';
+  let totalEarned = 0, totalPossible = 0;
+  let catRows = '';
+  RUBRIC.forEach(r=>{
+    const avg = counts[r.key] ? sums[r.key]/counts[r.key] : 0;
+    const earned = Math.round((avg/5)*r.wt);
+    totalEarned += earned; totalPossible += r.wt;
+    catRows += `<div class="fb-cat"><span class="fc-n">${r.name}</span><span class="fc-s">${earned} / ${r.wt}</span></div>`;
+  });
+  const recentNotes = allNotes.slice(-3).map(n=>`• ${n}`).join('<br>');
+  sheet.innerHTML = `
+    <div class="fb-head">
+      <h3>${c.name}</h3>
+      <div class="fb-sub">Herdsmanship Feedback · Woodbury County Fair 2026 · ${S.judge}</div>
+    </div>
+    ${catRows}
+    <div class="fb-total"><span>Average score</span><span>${totalEarned} / ${totalPossible}</span></div>
+    ${recentNotes?`<div class="fb-note"><b>Recent judge notes:</b><br>${recentNotes}</div>`:''}
+  `;
+  el.appendChild(sheet);
+  go('detail');
+}
+
+function renderSetup(){
+  const js = document.getElementById('judgeSeg'); js.innerHTML='';
+  JUDGES.forEach(j=>{
+    const b = document.createElement('button'); b.textContent=j; b.className=S.judge===j?'on':'';
+    b.onclick = ()=>{ S.judge=j; save(); renderSetup(); syncHeader(); };
+    js.appendChild(b);
+  });
+  const ps = document.getElementById('passSeg'); ps.innerHTML='';
+  PASSES.forEach(p=>{
+    const b = document.createElement('button'); b.textContent=p.label.replace('Day ','D').replace(' · ',' '); b.className=S.pass===p.id?'on':'';
+    b.onclick = ()=>{ S.pass=p.id; save(); renderSetup(); syncHeader(); };
+    ps.appendChild(b);
+  });
+  const rp = document.getElementById('rubricPanel'); rp.innerHTML='';
+  RUBRIC.forEach(c=>{
+    const d = document.createElement('div'); d.className='rubric-row';
+    d.innerHTML = `<span class="rn">${c.name}</span><span class="rw">${c.wt} pts</span>`;
+    rp.appendChild(d);
+  });
+}
+
+function syncHeader(){
+  document.getElementById('judgeName').textContent = S.judge;
+  document.getElementById('dayName').textContent = passLabel(S.pass);
+}
+function toast(msg){
+  const t = document.getElementById('toast'); t.textContent=msg; t.classList.add('show');
+  clearTimeout(t._t); t._t = setTimeout(()=>t.classList.remove('show'),1800);
+}
+function flashSaved(){
+  const d = document.getElementById('syncDot'), x = document.getElementById('syncTxt');
+  x.textContent='Saving…'; d.classList.add('off');
+  setTimeout(()=>{x.textContent='Saved'; d.classList.remove('off');},500);
+}
+function resetDemo(){ localStorage.removeItem(LS); S = load(); save(); syncHeader(); activeSpecies='beef'; go('score'); toast('↺ Demo reset'); }
+let tapN=0;
+function bumpOffline(){
+  tapN++; if(tapN>=3){
+    const b=document.getElementById('offBanner'); const on=b.style.display==='none';
+    b.style.display = on?'block':'none'; tapN=0;
+    toast(on?'⚠ Offline mode (demo)':'✓ Back online (demo)');
+  }
+}
+
+syncHeader();
+renderScore();
+</script>
+</body>
+</html>
