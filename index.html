@@ -291,6 +291,30 @@
       <h2 class="sec"><span>Rubric · 100 pts</span><span class="right">Woodbury 2026</span></h2>
       <div class="panel" id="rubricPanel"></div>
       <div class="hint">Source: Woodbury County Fair book, p.45. Inspected twice daily; daily scoring on all species combined for daily total. Final placings = sum across all inspection days.</div>
+
+      <h2 class="sec"><span>Cloud sync · Google Sheet</span><span class="right" id="syncBadge">Not configured</span></h2>
+      <div class="panel">
+        <div class="row" style="flex-direction:column; align-items:stretch; gap:8px;">
+          <span class="lab">Apps Script Web App URL</span>
+          <input id="syncUrl" type="url" placeholder="https://script.google.com/macros/s/…/exec"
+            style="width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:10px;font:inherit;font-size:14px;background:#fff;" />
+          <div style="display:flex;gap:8px;">
+            <button class="btn ghost" style="flex:1;height:46px;font-size:15px;" onclick="saveSyncUrl()">Save URL</button>
+            <button class="btn primary" style="flex:1;height:46px;font-size:15px;" onclick="syncNow()">Sync now</button>
+          </div>
+        </div>
+        <div class="row"><span class="lab">Last sync</span><span class="val" id="lastSyncTxt">Never</span></div>
+        <div class="row"><span class="lab">Queued (unsynced)</span><span class="val" id="queuedTxt">0</span></div>
+      </div>
+      <div class="hint">One-time setup: in your Google Drive, create a sheet → Extensions → Apps Script → paste the code from SETUP.md → Deploy as Web App → paste the URL here. Scores sync to the sheet when online; held locally when offline and retried on the next save.</div>
+
+      <h2 class="sec"><span>Superintendents</span></h2>
+      <div class="panel">
+        <div class="row"><span class="lab">Jamie Johnson</span><a class="val" href="tel:7122533336" style="color:var(--green-d);text-decoration:none;font-weight:600;">(712) 253-3336</a></div>
+        <div class="row"><span class="lab">Dee McKenna</span><a class="val" href="tel:7126356868" style="color:var(--green-d);text-decoration:none;font-weight:600;">(712) 635-6868</a></div>
+        <div class="row"><span class="lab">Ashley Diediker</span><a class="val" href="tel:7122535087" style="color:var(--green-d);text-decoration:none;font-weight:600;">(712) 253-5087</a></div>
+      </div>
+
       <h2 class="sec"><span>Demo</span></h2>
       <div class="panel">
         <div class="row" onclick="resetDemo()"><span class="lab" style="color:var(--danger)">Reset demo data</span><span class="val">↺</span></div>
@@ -408,7 +432,82 @@ function load(){
   });
   return s;
 }
-function save(){ localStorage.setItem(LS, JSON.stringify(S)); flashSaved(); }
+function save(){ localStorage.setItem(LS, JSON.stringify(S)); flashSaved(); queueAndPush(); }
+
+// ============ CLOUD SYNC (Google Sheet via Apps Script) ============
+const SYNC_LS = "hsm_sync_v1";
+function syncState(){
+  try { return JSON.parse(localStorage.getItem(SYNC_LS)) || {url:"", lastSync:0, queue:[]}; }
+  catch(e){ return {url:"", lastSync:0, queue:[]}; }
+}
+function saveSyncState(s){ localStorage.setItem(SYNC_LS, JSON.stringify(s)); }
+function saveSyncUrl(){
+  const u = document.getElementById('syncUrl').value.trim();
+  const st = syncState(); st.url = u; saveSyncState(st);
+  toast(u ? '✓ Sync URL saved' : '↺ Sync URL cleared');
+  renderSyncPanel();
+  if(u) syncNow();
+}
+function queueAndPush(){
+  // snapshot full state, queue it, attempt push
+  const st = syncState();
+  // dedupe: replace any prior snapshot with the latest
+  st.queue = [{ts: Date.now(), kind:'snapshot', payload:{judge:S.judge, pass:S.pass, scores:S.scores, schedule:S.schedule}}];
+  saveSyncState(st);
+  renderSyncPanel();
+  pushQueue();
+}
+function pushQueue(){
+  const st = syncState();
+  if(!st.url || !st.queue.length || !navigator.onLine) return;
+  const item = st.queue[0];
+  // Apps Script doPost: use text/plain to avoid CORS preflight
+  fetch(st.url, {
+    method:'POST',
+    mode:'cors',
+    headers:{'Content-Type':'text/plain;charset=utf-8'},
+    body: JSON.stringify({action:'snapshot', ...item.payload})
+  }).then(r=>r.json()).then(res=>{
+    if(res && res.ok){
+      const s2 = syncState(); s2.queue.shift(); s2.lastSync = Date.now(); saveSyncState(s2);
+      renderSyncPanel();
+    }
+  }).catch(()=>{/* leave queued; will retry */});
+}
+function syncNow(){
+  const st = syncState();
+  if(!st.url){ toast('⚠ Add the Apps Script URL first'); return; }
+  // also pull config (clubs/judges/rubric overrides) from sheet
+  fetch(st.url + '?action=config', {method:'GET'}).then(r=>r.json()).then(cfg=>{
+    if(cfg && cfg.ok && cfg.config){ applyRemoteConfig(cfg.config); toast('✓ Pulled config from sheet'); }
+  }).catch(()=>toast('⚠ Could not reach sheet'));
+  queueAndPush();
+}
+function applyRemoteConfig(cfg){
+  // Soft-merge: only overwrite if sheet provides non-empty arrays
+  if(Array.isArray(cfg.judges) && cfg.judges.length){
+    JUDGES.length = 0; cfg.judges.forEach(j=>JUDGES.push(j));
+  }
+  if(Array.isArray(cfg.clubs) && cfg.clubs.length){
+    CLUBS.length = 0; cfg.clubs.forEach(c=>CLUBS.push(c));
+  }
+  if(Array.isArray(cfg.rubric) && cfg.rubric.length){
+    RUBRIC.length = 0; cfg.rubric.forEach(r=>RUBRIC.push(r));
+  }
+  // re-render whatever's visible
+  renderScore(); syncHeader();
+}
+function renderSyncPanel(){
+  const st = syncState();
+  const u = document.getElementById('syncUrl'); if(u) u.value = st.url || '';
+  const b = document.getElementById('syncBadge');
+  if(b) b.textContent = !st.url ? 'Not configured' : (st.queue.length ? '⏳ Pending' : '✓ Synced');
+  const ls = document.getElementById('lastSyncTxt');
+  if(ls) ls.textContent = st.lastSync ? new Date(st.lastSync).toLocaleString() : 'Never';
+  const q = document.getElementById('queuedTxt'); if(q) q.textContent = st.queue.length;
+}
+window.addEventListener('online', ()=>{ pushQueue(); });
+setInterval(pushQueue, 30000); // retry every 30s
 
 function calc(r){
   if(!r) return 0;
@@ -786,6 +885,7 @@ function renderSetup(){
     d.innerHTML = `<span class="rn">${c.name}</span><span class="rw">${c.wt} pts</span>`;
     rp.appendChild(d);
   });
+  renderSyncPanel();
 }
 
 function syncHeader(){
@@ -813,6 +913,8 @@ function bumpOffline(){
 
 syncHeader();
 renderScore();
+// On launch: if a sync URL is configured, try to pull latest config and push queued
+if(syncState().url){ setTimeout(syncNow, 400); }
 </script>
 </body>
 </html>
