@@ -148,6 +148,24 @@
   .fb-cat .fc-s{font-weight:800; font-size:14px; color:var(--green-d); white-space:nowrap;}
   .fb-total{margin-top:10px; padding-top:10px; border-top:2px solid var(--green); display:flex; justify-content:space-between; font-weight:800; font-size:16px;}
   .fb-note{margin-top:14px; padding:11px 13px; background:var(--green-l); border-radius:10px; font-size:13px; line-height:1.45; color:var(--ink);}
+  /* SCHEDULE */
+  .sched-summary{background:var(--card); border:1px solid var(--line); border-radius:var(--r); padding:13px 15px; margin-bottom:12px;}
+  .sched-summary .ss-title{font-size:12px; text-transform:uppercase; letter-spacing:.7px; color:var(--muted); font-weight:700; margin-bottom:8px;}
+  .sched-summary .ss-row{display:flex; justify-content:space-between; align-items:center; padding:6px 0; font-size:14px;}
+  .sched-summary .ss-row .nm{font-weight:600;}
+  .sched-summary .ss-row .ct{background:var(--green-l); color:var(--green-d); font-weight:800; font-size:12.5px; padding:3px 9px; border-radius:7px;}
+  .sched-warn{background:var(--warn-bg); border:1px solid #f0deb8; color:var(--warn); border-radius:var(--r); padding:10px 13px; margin-bottom:12px; font-size:13px; font-weight:600; display:flex; align-items:center; gap:8px;}
+  .sched-pass{background:var(--card); border:1px solid var(--line); border-radius:var(--r); margin-bottom:11px; overflow:hidden;}
+  .sched-pass-head{display:flex; justify-content:space-between; align-items:center; padding:12px 15px; background:var(--green-l); color:var(--green-d); font-weight:800; font-size:15px;}
+  .sched-pass-head .meta{font-size:12px; font-weight:600; color:var(--green-d); opacity:.85;}
+  .sched-row{display:flex; align-items:center; padding:11px 15px; border-top:1px solid var(--line); cursor:pointer;}
+  .sched-row:active{background:var(--bg);}
+  .sched-row .em{font-size:19px; margin-right:10px;}
+  .sched-row .sp-name{flex:1; font-weight:600; font-size:14.5px;}
+  .sched-row .judge-pill{background:var(--green); color:#fff; font-weight:700; font-size:13px; padding:6px 13px; border-radius:999px; min-width:80px; text-align:center;}
+  .sched-row .judge-pill.unassigned{background:var(--warn-bg); color:var(--warn); border:1px dashed #e0c590;}
+  .sched-bulk{display:flex; gap:8px; margin-bottom:14px;}
+  .sched-bulk button{flex:1; background:#fff; border:1px solid var(--line); border-radius:10px; padding:10px; font-weight:700; font-size:13px; color:var(--ink); cursor:pointer;}
   nav{position:fixed; bottom:0; left:50%; transform:translateX(-50%); width:100%; max-width:430px; background:#fff; border-top:1px solid var(--line); display:flex; z-index:30; padding-bottom:env(safe-area-inset-bottom);}
   nav button{flex:1; background:none; border:none; padding:10px 0 12px; cursor:pointer; color:var(--muted); font-size:11px; font-weight:700; display:flex; flex-direction:column; align-items:center; gap:4px;}
   nav button .ic{font-size:21px; line-height:1;}
@@ -250,6 +268,18 @@
       </div>
     </section>
 
+    <section class="view" id="view-schedule">
+      <h2 class="sec"><span>Judge schedule</span><span class="right" id="schedCoverage">—</span></h2>
+      <div class="sched-bulk">
+        <button onclick="schedAutofill()">⚡ Auto-fill empty</button>
+        <button onclick="schedClear()" style="color:var(--danger)">↺ Clear all</button>
+      </div>
+      <div id="schedWarn"></div>
+      <div class="sched-summary" id="schedSummary"></div>
+      <div id="schedList"></div>
+      <div class="hint">Tap any species row to cycle through judges. Inspections are twice daily — make sure every barn has a judge each AM and PM.</div>
+    </section>
+
     <section class="view" id="view-setup">
       <h2 class="sec"><span>This session</span></h2>
       <div class="panel">
@@ -271,6 +301,7 @@
   <nav>
     <button id="nav-score" class="on" onclick="go('score')"><span class="ic">📋</span>Score</button>
     <button id="nav-results" onclick="go('results')"><span class="ic">🏆</span>Results</button>
+    <button id="nav-schedule" onclick="go('schedule')"><span class="ic">📅</span>Schedule</button>
     <button id="nav-setup" onclick="go('setup')"><span class="ic">⚙️</span>Setup</button>
   </nav>
   <div class="toast" id="toast"></div>
@@ -340,8 +371,8 @@ let draft = {};
 let resultsMode = "overall";
 
 function load(){
-  try{ const v=JSON.parse(localStorage.getItem(LS)); if(v) return v; }catch(e){}
-  const s = {judge:"Pat M.", pass:"d2pm", scores:{}};
+  try{ const v=JSON.parse(localStorage.getItem(LS)); if(v){ if(!v.schedule) v.schedule={}; return v; } }catch(e){}
+  const s = {judge:"Pat M.", pass:"d2pm", scores:{}, schedule:{}};
   let _r=12345; const rand=()=>{ _r=(_r*9301+49297)%233280; return _r/233280; };
   const rgen = (seed)=>{ let x=seed; return ()=>{ x=(x*9301+49297)%233280; return 3 + (x % 3); }; };
   const notes = [
@@ -366,6 +397,15 @@ function load(){
   seedPass("d1am", 1.0, 100);
   seedPass("d1pm", 0.85, 200);
   seedPass("d2am", 0.55, 300);
+  // demo schedule: Day 1 fully assigned, Day 2 partially, Day 3 empty so Jamie can see all states
+  const dayAssign = {
+    d1am: ["Pat M.","Pat M.","Dana R.","Dana R.","Sam K.","Sam K.","Jamie J.","Jamie J."],
+    d1pm: ["Dana R.","Dana R.","Pat M.","Pat M.","Jamie J.","Jamie J.","Sam K.","Sam K."],
+    d2am: ["Sam K.","Jamie J.","",      "Pat M.","Dana R.","",      "Pat M.","Dana R."],
+  };
+  Object.keys(dayAssign).forEach(pid=>{
+    SPECIES.forEach((sp,i)=>{ const j=dayAssign[pid][i]; if(j) s.schedule[`${pid}|${sp.id}`]=j; });
+  });
   return s;
 }
 function save(){ localStorage.setItem(LS, JSON.stringify(S)); flashSaved(); }
@@ -403,12 +443,13 @@ function passLabel(id){ return PASSES.find(p=>p.id===id)?.label || id; }
 function go(v){
   document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
   document.getElementById('view-'+v).classList.add('active');
-  ['score','results','setup'].forEach(n=>{
+  ['score','results','schedule','setup'].forEach(n=>{
     const b=document.getElementById('nav-'+n); if(b) b.classList.toggle('on', n===v ||
       (v==='sheet'&&n==='score') || (v==='detail'&&n==='results'));
   });
   if(v==='score') renderScore();
   if(v==='results') renderResults();
+  if(v==='schedule') renderSchedule();
   if(v==='setup') renderSetup();
   window.scrollTo(0,0);
 }
@@ -651,6 +692,79 @@ function renderFeedbackSheet(clubId){
   `;
   el.appendChild(sheet);
   go('detail');
+}
+
+function renderSchedule(){
+  // total slots = passes × species
+  const totalSlots = PASSES.length * SPECIES.length;
+  const assigned = Object.values(S.schedule||{}).filter(v=>v).length;
+  document.getElementById('schedCoverage').textContent = `${assigned}/${totalSlots} slots assigned`;
+
+  // warning if any slot empty
+  const wEl = document.getElementById('schedWarn');
+  if(assigned < totalSlots){
+    wEl.innerHTML = `<div class="sched-warn">⚠ ${totalSlots-assigned} inspection slot${totalSlots-assigned>1?'s':''} still need a judge</div>`;
+  } else { wEl.innerHTML=''; }
+
+  // load summary per judge
+  const counts = {}; JUDGES.forEach(j=>counts[j]=0);
+  Object.values(S.schedule||{}).forEach(j=>{ if(j && counts[j]!==undefined) counts[j]++; });
+  const ss = document.getElementById('schedSummary');
+  ss.innerHTML = `<div class="ss-title">Workload per judge</div>` +
+    JUDGES.map(j=>`<div class="ss-row"><span class="nm">${j}</span><span class="ct">${counts[j]} shift${counts[j]===1?'':'s'}</span></div>`).join('');
+
+  // per-pass schedule
+  const list = document.getElementById('schedList'); list.innerHTML='';
+  PASSES.forEach(p=>{
+    const block = document.createElement('div'); block.className='sched-pass';
+    const filledCount = SPECIES.filter(sp=>S.schedule[`${p.id}|${sp.id}`]).length;
+    const head = document.createElement('div'); head.className='sched-pass-head';
+    head.innerHTML = `<span>${p.label}</span><span class="meta">${filledCount}/${SPECIES.length} covered</span>`;
+    block.appendChild(head);
+    SPECIES.forEach(sp=>{
+      const row = document.createElement('div'); row.className='sched-row';
+      const key = `${p.id}|${sp.id}`;
+      const j = S.schedule[key] || '';
+      row.onclick = ()=>cycleJudge(p.id, sp.id);
+      row.innerHTML = `
+        <span class="em">${sp.em}</span>
+        <span class="sp-name">${sp.name}</span>
+        <span class="judge-pill ${j?'':'unassigned'}">${j || 'Unassigned'}</span>`;
+      block.appendChild(row);
+    });
+    list.appendChild(block);
+  });
+}
+function cycleJudge(passId, sp){
+  const key = `${passId}|${sp}`;
+  const cur = S.schedule[key] || '';
+  const cycle = ['', ...JUDGES]; // empty → Pat → Dana → Sam → Jamie → empty
+  const idx = cycle.indexOf(cur);
+  const next = cycle[(idx+1) % cycle.length];
+  if(next) S.schedule[key] = next; else delete S.schedule[key];
+  save(); renderSchedule();
+}
+function schedAutofill(){
+  // round-robin fill of empty slots, balancing workload
+  const counts = {}; JUDGES.forEach(j=>counts[j]=0);
+  Object.values(S.schedule||{}).forEach(j=>{ if(j && counts[j]!==undefined) counts[j]++; });
+  let filled = 0;
+  PASSES.forEach(p=>{
+    SPECIES.forEach(sp=>{
+      const key = `${p.id}|${sp.id}`;
+      if(S.schedule[key]) return;
+      // pick least-loaded judge
+      const j = JUDGES.slice().sort((a,b)=>counts[a]-counts[b])[0];
+      S.schedule[key] = j; counts[j]++; filled++;
+    });
+  });
+  save(); renderSchedule();
+  toast(`⚡ Filled ${filled} slot${filled===1?'':'s'}`);
+}
+function schedClear(){
+  if(!confirm('Clear all schedule assignments?')) return;
+  S.schedule = {}; save(); renderSchedule();
+  toast('↺ Schedule cleared');
 }
 
 function renderSetup(){
