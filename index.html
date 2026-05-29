@@ -221,7 +221,8 @@
 
     <section class="view" id="view-results">
       <div class="results-toggle">
-        <button id="rt-overall" class="on" onclick="setResultsMode('overall')">Overall standings</button>
+        <button id="rt-overall" class="on" onclick="setResultsMode('overall')">Overall</button>
+        <button id="rt-species" onclick="setResultsMode('species')">By Species</button>
         <button id="rt-today" onclick="setResultsMode('today')">Today</button>
       </div>
       <div class="premium-row">
@@ -500,16 +501,67 @@ function saveSheet(){
   setTimeout(()=>go('score'),350);
 }
 
-function setResultsMode(m){ resultsMode=m; document.getElementById('rt-overall').classList.toggle('on', m==='overall'); document.getElementById('rt-today').classList.toggle('on', m==='today'); renderResults(); }
+function setResultsMode(m){
+  resultsMode=m;
+  document.getElementById('rt-overall').classList.toggle('on', m==='overall');
+  document.getElementById('rt-species').classList.toggle('on', m==='species');
+  document.getElementById('rt-today').classList.toggle('on', m==='today');
+  renderResults();
+}
+// Sum of one club's scores within a single species
+function clubSpeciesTotal(clubId, sp){
+  let total=0, n=0;
+  PASSES.forEach(p=>{
+    const e = S.scores[`${clubId}|${sp}|${p.id}`];
+    if(e){ total += calc(e.r); n++; }
+  });
+  return {total, n};
+}
 function renderResults(){
-  document.getElementById('resultsLabel').textContent =
+  const el = document.getElementById('rankList'); el.innerHTML='';
+  const label = document.getElementById('resultsLabel');
+
+  // ---- BY SPECIES ----
+  if(resultsMode==='species'){
+    label.textContent = 'By species · total points within each barn';
+    let any=false;
+    SPECIES.forEach(sp=>{
+      const clubs = CLUBS.filter(c=>c.species.includes(sp.id));
+      const rows = clubs.map(c=>({c, ...clubSpeciesTotal(c.id, sp.id)}))
+                       .filter(r=>r.n>0)
+                       .sort((a,b)=>b.total-a.total);
+      if(!rows.length) return;
+      any=true;
+      const head = document.createElement('h2'); head.className='sec';
+      head.style.marginTop='18px';
+      head.innerHTML = `<span>${sp.em} ${sp.name}</span><span class="right">${rows.length} club${rows.length>1?'s':''}</span>`;
+      el.appendChild(head);
+      rows.forEach((row,i)=>{
+        const d = document.createElement('div');
+        d.className = 'rank' + (i===0?' gold':i===1?' silver':i===2?' bronze':'');
+        d.onclick = ()=>openDetail(row.c.id);
+        d.innerHTML = `
+          <div class="pos">${i+1}</div>
+          <div class="meta">
+            <div class="name">${row.c.name}</div>
+            <div class="passes">${row.n} inspection${row.n>1?'s':''} in this barn</div>
+          </div>
+          <div class="score">${row.total}<small> pts</small></div>`;
+        el.appendChild(d);
+      });
+    });
+    if(!any){ el.innerHTML = `<div class="empty"><div class="big">📋</div>No scores recorded yet.</div>`; }
+    return;
+  }
+
+  // ---- OVERALL / TODAY ----
+  label.textContent =
     resultsMode==='overall' ? 'Overall · all inspections so far' : `Today · ${passLabel(S.pass)}`;
   const rows = CLUBS.map(c=>{
     const t = resultsMode==='overall' ? clubTotal(c.id) : clubPassTotal(c.id, S.pass);
     return {c, ...t};
   }).filter(r=>r.n>0).sort((a,b)=>b.total-a.total);
 
-  const el = document.getElementById('rankList'); el.innerHTML='';
   if(!rows.length){ el.innerHTML = `<div class="empty"><div class="big">📋</div>No scores recorded yet for this view.</div>`; return; }
 
   const eligibleRanked = rows.filter(r=>r.speciesCount>=4);
