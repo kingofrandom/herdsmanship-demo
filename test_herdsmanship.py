@@ -54,6 +54,12 @@ class HerdsmanshipFeatureTests(unittest.TestCase):
         self.assertIn("Stalls Used", CODE_GS)
         self.assertIn("barnLayout", CODE_GS)
 
+    def test_prototype_banner_and_copy_are_removed(self):
+        self.assertNotIn('class="demo-banner"', INDEX)
+        self.assertNotIn("Prototype", INDEX)
+        self.assertNotIn("tap around freely", INDEX)
+        self.assertNotIn("placeholders", INDEX)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

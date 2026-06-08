@@ -189,10 +189,8 @@
   .toast{position:fixed; bottom:88px; left:50%; transform:translateX(-50%) translateY(20px); background:var(--ink); color:#fff; padding:12px 18px; border-radius:12px; font-weight:600; font-size:14.5px; opacity:0; pointer-events:none; transition:all .25s; z-index:50; white-space:nowrap; box-shadow:0 8px 24px rgba(0,0,0,.25); display:flex; align-items:center; gap:8px;}
   .toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
   .offline-banner{background:var(--warn-bg); color:var(--warn); font-size:12px; font-weight:600; text-align:center; padding:5px; border-bottom:1px solid #f0deb8;}
-  .demo-banner{background:#fef9e6; color:#7a5a00; font-size:12.5px; text-align:center; padding:8px 12px; border-bottom:1px solid #f0deb8; line-height:1.35;}
-  .demo-banner b{color:#5a4400;}
   @media print {
-    nav, header, .save-bar, .photo-row, .note-wrap, .toast, .demo-banner { display:none !important; }
+    nav, header, .save-bar, .photo-row, .note-wrap, .toast { display:none !important; }
     .phone { box-shadow:none; max-width:100%; }
     main { padding-bottom:0 !important; }
     .fb-sheet { page-break-inside:avoid; }
@@ -215,7 +213,6 @@
       <span class="chip" onclick="go('setup')">📅 <span id="dayName">Thursday PM</span></span>
     </div>
   </header>
-  <div class="demo-banner"><b>Prototype</b> — tap around freely. Camera, voice, and export are placeholders; scoring, results, and the feedback sheet are fully working.</div>
   <div class="offline-banner" id="offBanner" style="display:none;">⚠ Offline — scores saved on this phone, will sync when signal returns</div>
 
   <main>
