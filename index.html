@@ -56,9 +56,25 @@
   .sp .ct{background:var(--bg); color:var(--muted); font-size:11.5px; padding:2px 7px; border-radius:999px; font-weight:700;}
   .sp.on{background:var(--green); border-color:var(--green); color:#fff;}
   .sp.on .ct{background:rgba(255,255,255,.22); color:#fff;}
+  .barn-map{background:linear-gradient(180deg,#ffffff 0%,#f7fbf8 100%); border:1px solid var(--line); border-radius:var(--r); padding:12px 13px; margin:0 0 12px;}
+  .barn-map-head{display:flex; justify-content:space-between; gap:10px; align-items:flex-start; margin-bottom:9px;}
+  .barn-map-title{font-weight:800; font-size:14px; color:var(--green-d);}
+  .barn-map-sub{font-size:12px; color:var(--muted); margin-top:2px; line-height:1.35;}
+  .barn-map-total{background:var(--green); color:#fff; border-radius:11px; min-width:58px; text-align:center; padding:6px 8px; font-weight:800;}
+  .barn-map-total small{display:block; font-size:9.5px; text-transform:uppercase; letter-spacing:.55px; opacity:.85; margin-top:1px;}
+  .barn-row{display:grid; grid-template-columns:44px 1fr; gap:9px; padding:8px 0; border-top:1px solid var(--line);}
+  .barn-row:first-of-type{border-top:none;}
+  .barn-row .badge{width:44px;height:44px;border-radius:11px;background:var(--green-l);color:var(--green-d);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;flex-direction:column;gap:1px;}
+  .barn-row .pen-num{font-size:20px; line-height:1;}
+  .barn-row .pen-label{font-size:8.5px; letter-spacing:.65px;}
+  .barn-row .stall-name{font-weight:700; font-size:13.5px; line-height:1.25;}
+  .barn-row .stall-loc{font-size:12px; color:var(--muted); margin-top:2px; line-height:1.35;}
   .club{background:var(--card); border:1px solid var(--line); border-radius:var(--r); padding:14px 15px; margin-bottom:10px; display:flex; align-items:center; gap:13px; cursor:pointer; transition:transform .08s;}
   .club:active{transform:scale(.985);}
   .club .badge{width:44px;height:44px;border-radius:11px;background:var(--green-l);color:var(--green-d);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;flex-shrink:0;}
+  .club .pen-badge{flex-direction:column; gap:1px;}
+  .club .pen-num{font-size:20px; line-height:1;}
+  .club .pen-label{font-size:8.5px; letter-spacing:.65px;}
   .club .meta{flex:1; min-width:0;}
   .club .name{font-weight:700; font-size:16px; line-height:1.25;}
   .club .loc{font-size:12.5px; color:var(--muted); margin-top:2px;}
@@ -196,7 +212,7 @@
     </div>
     <div class="h-context">
       <span class="chip" onclick="go('setup')">👤 <span id="judgeName">Pat M.</span></span>
-      <span class="chip" onclick="go('setup')">📅 <span id="dayName">Day 2 · PM</span></span>
+      <span class="chip" onclick="go('setup')">📅 <span id="dayName">Thursday PM</span></span>
     </div>
   </header>
   <div class="demo-banner"><b>Prototype</b> — tap around freely. Camera, voice, and export are placeholders; scoring, results, and the feedback sheet are fully working.</div>
@@ -206,6 +222,7 @@
     <section class="view active" id="view-score">
       <h2 class="sec"><span>Pick a barn / species</span><span class="right" id="progressTxt">—</span></h2>
       <div class="species-bar" id="speciesBar"></div>
+      <div class="barn-map" id="barnMap"></div>
       <h2 class="sec"><span id="speciesLabel">Clubs to score</span></h2>
       <div id="clubList"></div>
     </section>
@@ -349,12 +366,14 @@ const RUBRIC = [
 
 const JUDGES = ["Pat M.","Dana R.","Sam K.","Jamie J."];
 const PASSES = [
-  {id:"d1am", label:"Day 1 · AM"},
-  {id:"d1pm", label:"Day 1 · PM"},
-  {id:"d2am", label:"Day 2 · AM"},
-  {id:"d2pm", label:"Day 2 · PM"},
-  {id:"d3am", label:"Day 3 · AM"},
-  {id:"d3pm", label:"Day 3 · PM"},
+  {id:"d1am", label:"Wednesday AM"},
+  {id:"d1pm", label:"Wednesday PM"},
+  {id:"d2am", label:"Thursday AM"},
+  {id:"d2pm", label:"Thursday PM"},
+  {id:"d3am", label:"Friday AM"},
+  {id:"d3pm", label:"Friday PM"},
+  {id:"d4am", label:"Saturday AM"},
+  {id:"d4pm", label:"Saturday PM"},
 ];
 const QUICK = ["Bedding dry & clean","Stall cards incomplete","Refill water","Excellent grooming","Aisle blocked","Manure not hauled","Great cooperation","Animals not secured"];
 const SPECIES = [
@@ -385,6 +404,32 @@ const CLUBS = [
   {id:"sunday",   name:"Sunday Funday",            species:["rabbit","poultry"]},
   {id:"willow",   name:"Willow Workers",           species:["beef","dairy","goat","horse","poultry"]},
   {id:"innov",    name:"Woodbury Innovators",      species:["swine","rabbit"]},
+];
+
+const BARN_LAYOUT = [
+  {clubId:"anthon", species:"beef", pens:4, stalls:"A1–A4", location:"North beef barn, west aisle"},
+  {clubId:"arlington", species:"beef", pens:3, stalls:"A5–A7", location:"North beef barn, west aisle"},
+  {clubId:"bronson", species:"beef", pens:6, stalls:"B1–B6", location:"North beef barn, center aisle"},
+  {clubId:"bryant", species:"beef", pens:3, stalls:"B7–B9", location:"North beef barn, center aisle"},
+  {clubId:"grant", species:"beef", pens:2, stalls:"C1–C2", location:"North beef barn, east aisle"},
+  {clubId:"lucky", species:"beef", pens:3, stalls:"C3–C5", location:"North beef barn, east aisle"},
+  {clubId:"pierson", species:"beef", pens:4, stalls:"C6–C9", location:"North beef barn, east aisle"},
+  {clubId:"rockbr", species:"beef", pens:2, stalls:"D1–D2", location:"Overflow beef row"},
+  {clubId:"willow", species:"beef", pens:5, stalls:"D3–D7", location:"Overflow beef row"},
+  {clubId:"anthon", species:"sheep", pens:3, stalls:"S1–S3", location:"Sheep barn, north wall"},
+  {clubId:"banner", species:"sheep", pens:3, stalls:"S4–S6", location:"Sheep barn, north wall"},
+  {clubId:"bronson", species:"sheep", pens:4, stalls:"S7–S10", location:"Sheep barn, center row"},
+  {clubId:"goodluck", species:"sheep", pens:4, stalls:"S11–S14", location:"Sheep barn, center row"},
+  {clubId:"lucky", species:"sheep", pens:3, stalls:"S15–S17", location:"Sheep barn, south wall"},
+  {clubId:"pierson", species:"sheep", pens:4, stalls:"S18–S21", location:"Sheep barn, south wall"},
+  {clubId:"anthon", species:"swine", pens:4, stalls:"P1–P4", location:"Swine barn, west row"},
+  {clubId:"arlington", species:"swine", pens:3, stalls:"P5–P7", location:"Swine barn, west row"},
+  {clubId:"bronson", species:"swine", pens:5, stalls:"P8–P12", location:"Swine barn, center row"},
+  {clubId:"bryant", species:"swine", pens:3, stalls:"P13–P15", location:"Swine barn, center row"},
+  {clubId:"grant", species:"swine", pens:2, stalls:"P16–P17", location:"Swine barn, east row"},
+  {clubId:"pierson", species:"swine", pens:4, stalls:"P18–P21", location:"Swine barn, east row"},
+  {clubId:"rockbr", species:"swine", pens:2, stalls:"P22–P23", location:"Swine barn, east row"},
+  {clubId:"rockkee", species:"swine", pens:3, stalls:"P24–P26", location:"Swine barn, east row"},
 ];
 
 const LS="hsm_woodbury_v2";
@@ -491,6 +536,9 @@ function applyRemoteConfig(cfg){
   if(Array.isArray(cfg.clubs) && cfg.clubs.length){
     CLUBS.length = 0; cfg.clubs.forEach(c=>CLUBS.push(c));
   }
+  if(Array.isArray(cfg.barnLayout) && cfg.barnLayout.length){
+    BARN_LAYOUT.length = 0; cfg.barnLayout.forEach(row=>BARN_LAYOUT.push(row));
+  }
   if(Array.isArray(cfg.rubric) && cfg.rubric.length){
     RUBRIC.length = 0; cfg.rubric.forEach(r=>RUBRIC.push(r));
   }
@@ -553,6 +601,40 @@ function go(v){
   window.scrollTo(0,0);
 }
 
+function layoutFor(clubId, sp){
+  return BARN_LAYOUT.find(x=>x.clubId===clubId && x.species===sp) || null;
+}
+function penCountFor(clubId, sp){
+  const layout = layoutFor(clubId, sp);
+  return layout && Number(layout.pens) ? Number(layout.pens) : 0;
+}
+function escapeHtml(value){
+  return String(value ?? '').replace(/[&<>"]/g, ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
+}
+function renderBarnMap(sp){
+  const el = document.getElementById('barnMap');
+  if(!el) return;
+  const spDef = SPECIES.find(x=>x.id===sp);
+  const rows = clubsForSpecies(sp).map(c=>({club:c, layout:layoutFor(c.id, sp)}));
+  const totalPens = rows.reduce((sum,row)=>sum + (row.layout && Number(row.layout.pens) ? Number(row.layout.pens) : 0), 0);
+  const missing = rows.filter(row=>!row.layout).length;
+  const rowHtml = rows.map(row=>{
+    const l = row.layout;
+    const pens = l && Number(l.pens) ? Number(l.pens) : 0;
+    const stalls = l ? escapeHtml(l.stalls || 'Stalls not set') : 'Stalls not set';
+    const location = l ? escapeHtml(l.location || '') : 'Add this club/species to the Barn Layout sheet';
+    return `<div class="barn-row">
+      <div class="badge pen-badge"><span class="pen-num">${pens || '—'}</span><span class="pen-label">PENS</span></div>
+      <div><div class="stall-name">${escapeHtml(row.club.name)} · ${stalls}</div><div class="stall-loc">${location}</div></div>
+    </div>`;
+  }).join('');
+  el.innerHTML = `<div class="barn-map-head">
+    <div><div class="barn-map-title">Barn layout map · ${spDef.em} ${spDef.name}</div>
+    <div class="barn-map-sub">Use this to confirm each club's pen count, stalls used, and barn location before scoring.${missing ? ` ${missing} club${missing>1?'s':''} need layout details.` : ''}</div></div>
+    <div class="barn-map-total">${totalPens || '—'}<small>pens</small></div>
+  </div>${rowHtml}`;
+}
+
 function clubsForSpecies(sp){ return CLUBS.filter(c => c.species.includes(sp)); }
 function renderScore(){
   const sb = document.getElementById('speciesBar'); sb.innerHTML='';
@@ -573,6 +655,7 @@ function renderScore(){
   document.getElementById('speciesLabel').textContent = `${spDef.em} ${spDef.name} · ${passLabel(S.pass)}`;
   const list = document.getElementById('clubList'); list.innerHTML='';
   const clubs = clubsForSpecies(activeSpecies);
+  renderBarnMap(activeSpecies);
   if(!clubs.length){
     list.innerHTML = `<div class="empty"><div class="big">🌾</div>No clubs exhibiting ${spDef.name} this year.</div>`;
     return;
@@ -580,12 +663,14 @@ function renderScore(){
   clubs.forEach(c=>{
     const e = S.scores[`${c.id}|${activeSpecies}|${S.pass}`];
     const done = !!e; const sc = done?calc(e.r):null;
-    const init = c.name.split(/\s+/).slice(0,2).map(w=>w[0]).join('').toUpperCase();
+    const layout = layoutFor(c.id, activeSpecies);
+    const pens = penCountFor(c.id, activeSpecies);
+    const stallText = layout ? `${layout.stalls || 'Stalls not set'} · ${layout.location || 'Location not set'}` : 'Barn layout not set';
     const d = document.createElement('div'); d.className='club';
     d.onclick = ()=>openSheet(c.id, activeSpecies);
     d.innerHTML = `
-      <div class="badge">${init}</div>
-      <div class="meta"><div class="name">${c.name}</div><div class="loc">${spDef.em} ${spDef.name} barn · ${c.species.length} species exhibited</div></div>
+      <div class="badge pen-badge"><span class="pen-num">${pens || '—'}</span><span class="pen-label">PENS</span></div>
+      <div class="meta"><div class="name">${c.name}</div><div class="loc">${spDef.em} ${spDef.name} · ${stallText}</div></div>
       <div class="stat">${done
         ? `<span class="pill done"><span class="sc">${sc}</span>/100 ✓</span>`
         : `<span class="pill todo">Not scored</span>`}</div>
@@ -875,7 +960,7 @@ function renderSetup(){
   });
   const ps = document.getElementById('passSeg'); ps.innerHTML='';
   PASSES.forEach(p=>{
-    const b = document.createElement('button'); b.textContent=p.label.replace('Day ','D').replace(' · ',' '); b.className=S.pass===p.id?'on':'';
+    const b = document.createElement('button'); b.textContent=p.label; b.className=S.pass===p.id?'on':'';
     b.onclick = ()=>{ S.pass=p.id; save(); renderSetup(); syncHeader(); };
     ps.appendChild(b);
   });

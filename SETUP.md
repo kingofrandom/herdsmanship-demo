@@ -7,10 +7,10 @@ in **your** Google Drive.
 ## What you'll end up with
 
 - A Google Sheet in your Drive named "Herdsmanship 2026 (Woodbury)"
-  with tabs: Clubs, Judges, Rubric, Species, Settings, Scores, Schedule.
+  with tabs: Clubs, Barn Layout, Judges, Rubric, Species, Settings, Scores, Schedule.
 - A web app URL (long, ugly string) — paste it into the PWA's Setup
   screen on each judge's phone.
-- Edits to Clubs / Judges / Rubric you make in the sheet show up in
+- Edits to Clubs / Barn Layout / Judges / Rubric you make in the sheet show up in
   the PWA the next time a judge opens it.
 - Scores entered in the PWA appear in the Scores tab within seconds
   (or get queued offline and sync on the next save when signal returns).
@@ -34,8 +34,8 @@ in **your** Google Drive.
    **Review permissions** → pick your Google account → **Advanced** →
    **Go to Herdsmanship Backend (unsafe)** → **Allow**. (This is the
    normal Google warning for any script you wrote yourself.)
-6. Go back to the sheet — you should now see the 7 tabs filled with
-   the Woodbury clubs, rubric, etc.
+6. Go back to the sheet — you should now see the 8 tabs filled with
+   the Woodbury clubs, barn layout, rubric, etc.
 
 ## Step 3 — Deploy as a Web App
 
@@ -73,6 +73,9 @@ What Jamie controls from the sheet:
 - **Clubs tab** — fix the leader names that came in truncated from
   the photo. Add a new club row if needed. Comma-separated species
   per club determines which species rows show up under each club.
+- **Barn Layout tab** — set each club/species `Pen Count`, `Stalls Used`,
+  and `Location Notes`. These fields drive the pen-count badge and the
+  barn layout map shown below the species picker.
 - **Judges tab** — add/remove judges; set Active to N to hide one
   without deleting their row.
 - **Rubric tab** — change weights or hints. Total should stay 100.
