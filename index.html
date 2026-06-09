@@ -322,6 +322,14 @@
       </div>
       <div class="hint">One-time setup: in your Google Drive, create a sheet → Extensions → Apps Script → paste the code from SETUP.md → Deploy as Web App → paste the URL here. Scores sync to the sheet when online; held locally when offline and retried on the next save.</div>
 
+      <h2 class="sec"><span>Sheet-managed fair layout</span></h2>
+      <div class="panel">
+        <div class="row"><span class="lab">Barns tab</span><span class="val">Add/edit buildings and species areas</span></div>
+        <div class="row"><span class="lab">Stalls tab</span><span class="val">Maintain available stall/pen inventory</span></div>
+        <div class="row"><span class="lab">Barn Layout tab</span><span class="val">Assign clubs to barns and stalls</span></div>
+      </div>
+      <div class="hint">The PWA does not edit barns directly. Jamie manages barns, stall inventory, and assignments in the Google Sheet; judges tap Sync now to pull the latest layout.</div>
+
       <h2 class="sec"><span>Superintendents</span></h2>
       <div class="panel">
         <div class="row"><span class="lab">Jamie Johnson</span><a class="val" href="tel:7122533336" style="color:var(--green-d);text-decoration:none;font-weight:600;">(712) 253-3336</a></div>
@@ -403,30 +411,53 @@ const CLUBS = [
   {id:"innov",    name:"Woodbury Innovators",      species:["swine","rabbit"]},
 ];
 
+const BARNS = [
+  {id:"beef-north", name:"North Beef Barn", species:["beef","dairy"], area:"North barn", sort:10, notes:"Main beef and dairy stalling"},
+  {id:"sheep", name:"Sheep Barn", species:["sheep","goat"], area:"Small animal barn", sort:20, notes:"Sheep and goat pens"},
+  {id:"swine", name:"Swine Barn", species:["swine"], area:"East barn", sort:30, notes:"Swine pens"},
+  {id:"horse", name:"Horse Barn", species:["horse"], area:"Horse barn", sort:40, notes:"Horse stalls"},
+  {id:"small-animal", name:"Rabbit & Poultry Barn", species:["rabbit","poultry"], area:"Small animal barn", sort:50, notes:"Rabbit and poultry cages"},
+];
+
+const STALLS = [
+  {barnId:"beef-north", stallId:"A1", species:"beef", label:"A1", status:"open", notes:"West aisle"},
+  {barnId:"beef-north", stallId:"A2", species:"beef", label:"A2", status:"open", notes:"West aisle"},
+  {barnId:"beef-north", stallId:"A3", species:"beef", label:"A3", status:"open", notes:"West aisle"},
+  {barnId:"beef-north", stallId:"A4", species:"beef", label:"A4", status:"open", notes:"West aisle"},
+  {barnId:"beef-north", stallId:"B1", species:"beef", label:"B1", status:"open", notes:"Center aisle"},
+  {barnId:"beef-north", stallId:"B2", species:"beef", label:"B2", status:"open", notes:"Center aisle"},
+  {barnId:"sheep", stallId:"S1", species:"sheep", label:"S1", status:"open", notes:"North wall"},
+  {barnId:"sheep", stallId:"S2", species:"sheep", label:"S2", status:"open", notes:"North wall"},
+  {barnId:"sheep", stallId:"S3", species:"sheep", label:"S3", status:"open", notes:"North wall"},
+  {barnId:"swine", stallId:"P1", species:"swine", label:"P1", status:"open", notes:"West row"},
+  {barnId:"swine", stallId:"P2", species:"swine", label:"P2", status:"open", notes:"West row"},
+  {barnId:"swine", stallId:"P3", species:"swine", label:"P3", status:"open", notes:"West row"},
+];
+
 const BARN_LAYOUT = [
-  {clubId:"anthon", species:"beef", pens:4, stalls:"A1–A4", location:"North beef barn, west aisle"},
-  {clubId:"arlington", species:"beef", pens:3, stalls:"A5–A7", location:"North beef barn, west aisle"},
-  {clubId:"bronson", species:"beef", pens:6, stalls:"B1–B6", location:"North beef barn, center aisle"},
-  {clubId:"bryant", species:"beef", pens:3, stalls:"B7–B9", location:"North beef barn, center aisle"},
-  {clubId:"grant", species:"beef", pens:2, stalls:"C1–C2", location:"North beef barn, east aisle"},
-  {clubId:"lucky", species:"beef", pens:3, stalls:"C3–C5", location:"North beef barn, east aisle"},
-  {clubId:"pierson", species:"beef", pens:4, stalls:"C6–C9", location:"North beef barn, east aisle"},
-  {clubId:"rockbr", species:"beef", pens:2, stalls:"D1–D2", location:"Overflow beef row"},
-  {clubId:"willow", species:"beef", pens:5, stalls:"D3–D7", location:"Overflow beef row"},
-  {clubId:"anthon", species:"sheep", pens:3, stalls:"S1–S3", location:"Sheep barn, north wall"},
-  {clubId:"banner", species:"sheep", pens:3, stalls:"S4–S6", location:"Sheep barn, north wall"},
-  {clubId:"bronson", species:"sheep", pens:4, stalls:"S7–S10", location:"Sheep barn, center row"},
-  {clubId:"goodluck", species:"sheep", pens:4, stalls:"S11–S14", location:"Sheep barn, center row"},
-  {clubId:"lucky", species:"sheep", pens:3, stalls:"S15–S17", location:"Sheep barn, south wall"},
-  {clubId:"pierson", species:"sheep", pens:4, stalls:"S18–S21", location:"Sheep barn, south wall"},
-  {clubId:"anthon", species:"swine", pens:4, stalls:"P1–P4", location:"Swine barn, west row"},
-  {clubId:"arlington", species:"swine", pens:3, stalls:"P5–P7", location:"Swine barn, west row"},
-  {clubId:"bronson", species:"swine", pens:5, stalls:"P8–P12", location:"Swine barn, center row"},
-  {clubId:"bryant", species:"swine", pens:3, stalls:"P13–P15", location:"Swine barn, center row"},
-  {clubId:"grant", species:"swine", pens:2, stalls:"P16–P17", location:"Swine barn, east row"},
-  {clubId:"pierson", species:"swine", pens:4, stalls:"P18–P21", location:"Swine barn, east row"},
-  {clubId:"rockbr", species:"swine", pens:2, stalls:"P22–P23", location:"Swine barn, east row"},
-  {clubId:"rockkee", species:"swine", pens:3, stalls:"P24–P26", location:"Swine barn, east row"},
+  {clubId:"anthon", species:"beef", barnId:"beef-north", pens:4, stalls:"A1–A4", location:"West aisle"},
+  {clubId:"arlington", species:"beef", barnId:"beef-north", pens:3, stalls:"A5–A7", location:"West aisle"},
+  {clubId:"bronson", species:"beef", barnId:"beef-north", pens:6, stalls:"B1–B6", location:"Center aisle"},
+  {clubId:"bryant", species:"beef", barnId:"beef-north", pens:3, stalls:"B7–B9", location:"Center aisle"},
+  {clubId:"grant", species:"beef", barnId:"beef-north", pens:2, stalls:"C1–C2", location:"East aisle"},
+  {clubId:"lucky", species:"beef", barnId:"beef-north", pens:3, stalls:"C3–C5", location:"East aisle"},
+  {clubId:"pierson", species:"beef", barnId:"beef-north", pens:4, stalls:"C6–C9", location:"East aisle"},
+  {clubId:"rockbr", species:"beef", barnId:"beef-north", pens:2, stalls:"D1–D2", location:"Overflow beef row"},
+  {clubId:"willow", species:"beef", barnId:"beef-north", pens:5, stalls:"D3–D7", location:"Overflow beef row"},
+  {clubId:"anthon", species:"sheep", barnId:"sheep", pens:3, stalls:"S1–S3", location:"North wall"},
+  {clubId:"banner", species:"sheep", barnId:"sheep", pens:3, stalls:"S4–S6", location:"North wall"},
+  {clubId:"bronson", species:"sheep", barnId:"sheep", pens:4, stalls:"S7–S10", location:"Center row"},
+  {clubId:"goodluck", species:"sheep", barnId:"sheep", pens:4, stalls:"S11–S14", location:"Center row"},
+  {clubId:"lucky", species:"sheep", barnId:"sheep", pens:3, stalls:"S15–S17", location:"South wall"},
+  {clubId:"pierson", species:"sheep", barnId:"sheep", pens:4, stalls:"S18–S21", location:"South wall"},
+  {clubId:"anthon", species:"swine", barnId:"swine", pens:4, stalls:"P1–P4", location:"West row"},
+  {clubId:"arlington", species:"swine", barnId:"swine", pens:3, stalls:"P5–P7", location:"West row"},
+  {clubId:"bronson", species:"swine", barnId:"swine", pens:5, stalls:"P8–P12", location:"Center row"},
+  {clubId:"bryant", species:"swine", barnId:"swine", pens:3, stalls:"P13–P15", location:"Center row"},
+  {clubId:"grant", species:"swine", barnId:"swine", pens:2, stalls:"P16–P17", location:"East row"},
+  {clubId:"pierson", species:"swine", barnId:"swine", pens:4, stalls:"P18–P21", location:"East row"},
+  {clubId:"rockbr", species:"swine", barnId:"swine", pens:2, stalls:"P22–P23", location:"East row"},
+  {clubId:"rockkee", species:"swine", barnId:"swine", pens:3, stalls:"P24–P26", location:"East row"},
 ];
 
 const LS="hsm_woodbury_v2";
@@ -533,6 +564,12 @@ function applyRemoteConfig(cfg){
   if(Array.isArray(cfg.clubs) && cfg.clubs.length){
     CLUBS.length = 0; cfg.clubs.forEach(c=>CLUBS.push(c));
   }
+  if(Array.isArray(cfg.barns) && cfg.barns.length){
+    BARNS.length = 0; cfg.barns.forEach(b=>BARNS.push(b));
+  }
+  if(Array.isArray(cfg.stalls) && cfg.stalls.length){
+    STALLS.length = 0; cfg.stalls.forEach(s=>STALLS.push(s));
+  }
   if(Array.isArray(cfg.barnLayout) && cfg.barnLayout.length){
     BARN_LAYOUT.length = 0; cfg.barnLayout.forEach(row=>BARN_LAYOUT.push(row));
   }
@@ -601,6 +638,16 @@ function go(v){
 function layoutFor(clubId, sp){
   return BARN_LAYOUT.find(x=>x.clubId===clubId && x.species===sp) || null;
 }
+function barnFor(layout, sp){
+  if(layout && layout.barnId){
+    const exact = BARNS.find(b=>b.id===layout.barnId);
+    if(exact) return exact;
+  }
+  return BARNS.slice().sort((a,b)=>(a.sort||0)-(b.sort||0)).find(b=>(b.species||[]).includes(sp)) || null;
+}
+function stallInventoryFor(barnId, sp){
+  return STALLS.filter(s=>s.barnId===barnId && (!sp || !s.species || s.species===sp));
+}
 function penCountFor(clubId, sp){
   const layout = layoutFor(clubId, sp);
   return layout && Number(layout.pens) ? Number(layout.pens) : 0;
@@ -614,12 +661,18 @@ function renderBarnMap(sp){
   const spDef = SPECIES.find(x=>x.id===sp);
   const rows = clubsForSpecies(sp).map(c=>({club:c, layout:layoutFor(c.id, sp)}));
   const totalPens = rows.reduce((sum,row)=>sum + (row.layout && Number(row.layout.pens) ? Number(row.layout.pens) : 0), 0);
+  const barnsForSpecies = BARNS.filter(b=>(b.species||[]).includes(sp)).sort((a,b)=>(a.sort||0)-(b.sort||0));
+  const inventoryCount = barnsForSpecies.reduce((sum,b)=>sum + stallInventoryFor(b.id, sp).length, 0);
   const missing = rows.filter(row=>!row.layout).length;
   const rowHtml = rows.map(row=>{
     const l = row.layout;
+    const barn = barnFor(l, sp);
+    const inventory = barn ? stallInventoryFor(barn.id, sp) : [];
     const pens = l && Number(l.pens) ? Number(l.pens) : 0;
     const stalls = l ? escapeHtml(l.stalls || 'Stalls not set') : 'Stalls not set';
-    const location = l ? escapeHtml(l.location || '') : 'Add this club/species to the Barn Layout sheet';
+    const barnName = barn ? escapeHtml(barn.name) : 'Barn not set';
+    const locationBits = [barnName, l && l.location ? escapeHtml(l.location) : '', inventory.length ? `${inventory.length} inventory stalls` : ''].filter(Boolean).join(' · ');
+    const location = l ? locationBits : 'Add this club/species to the Barn Layout sheet';
     return `<div class="barn-row">
       <div class="badge pen-badge"><span class="pen-num">${pens || '—'}</span><span class="pen-label">PENS</span></div>
       <div><div class="stall-name">${escapeHtml(row.club.name)} · ${stalls}</div><div class="stall-loc">${location}</div></div>
@@ -627,7 +680,7 @@ function renderBarnMap(sp){
   }).join('');
   el.innerHTML = `<div class="barn-map-head">
     <div><div class="barn-map-title">Barn layout map · ${spDef.em} ${spDef.name}</div>
-    <div class="barn-map-sub">Use this to confirm each club's pen count, stalls used, and barn location before scoring.${missing ? ` ${missing} club${missing>1?'s':''} need layout details.` : ''}</div></div>
+    <div class="barn-map-sub">Barns tab defines buildings; Stalls tab defines available stall inventory; Barn Layout assigns clubs to barns/stalls. ${barnsForSpecies.length || 'No'} barn${barnsForSpecies.length===1?'':'s'} · ${inventoryCount || 'no'} inventory stalls.${missing ? ` ${missing} club${missing>1?'s':''} need layout details.` : ''}</div></div>
     <div class="barn-map-total">${totalPens || '—'}<small>pens</small></div>
   </div>${rowHtml}`;
 }
@@ -661,8 +714,9 @@ function renderScore(){
     const e = S.scores[`${c.id}|${activeSpecies}|${S.pass}`];
     const done = !!e; const sc = done?calc(e.r):null;
     const layout = layoutFor(c.id, activeSpecies);
+    const barn = barnFor(layout, activeSpecies);
     const pens = penCountFor(c.id, activeSpecies);
-    const stallText = layout ? `${layout.stalls || 'Stalls not set'} · ${layout.location || 'Location not set'}` : 'Barn layout not set';
+    const stallText = layout ? `${barn ? barn.name + ' · ' : ''}${layout.stalls || 'Stalls not set'} · ${layout.location || 'Location not set'}` : 'Barn layout not set';
     const d = document.createElement('div'); d.className='club';
     d.onclick = ()=>openSheet(c.id, activeSpecies);
     d.innerHTML = `

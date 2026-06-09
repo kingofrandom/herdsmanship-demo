@@ -7,10 +7,10 @@ in **your** Google Drive.
 ## What you'll end up with
 
 - A Google Sheet in your Drive named "Herdsmanship 2026 (Woodbury)"
-  with tabs: Clubs, Barn Layout, Judges, Rubric, Species, Settings, Scores, Schedule.
+  with tabs: Clubs, Barns, Stalls, Barn Layout, Judges, Rubric, Species, Settings, Scores, Schedule.
 - A web app URL (long, ugly string) — paste it into the PWA's Setup
   screen on each judge's phone.
-- Edits to Clubs / Barn Layout / Judges / Rubric you make in the sheet show up in
+- Edits to Clubs / Barns / Stalls / Barn Layout / Judges / Rubric you make in the sheet show up in
   the PWA the next time a judge opens it.
 - Scores entered in the PWA appear in the Scores tab within seconds
   (or get queued offline and sync on the next save when signal returns).
@@ -34,8 +34,8 @@ in **your** Google Drive.
    **Review permissions** → pick your Google account → **Advanced** →
    **Go to Herdsmanship Backend (unsafe)** → **Allow**. (This is the
    normal Google warning for any script you wrote yourself.)
-6. Go back to the sheet — you should now see the 8 tabs filled with
-   the Woodbury clubs, barn layout, rubric, etc.
+6. Go back to the sheet — you should now see the 10 tabs filled with
+   the Woodbury clubs, barns, stalls, barn layout, rubric, etc.
 
 ## Step 3 — Deploy as a Web App
 
@@ -73,9 +73,15 @@ What Jamie controls from the sheet:
 - **Clubs tab** — fix the leader names that came in truncated from
   the photo. Add a new club row if needed. Comma-separated species
   per club determines which species rows show up under each club.
-- **Barn Layout tab** — set each club/species `Pen Count`, `Stalls Used`,
-  and `Location Notes`. These fields drive the pen-count badge and the
-  barn layout map shown below the species picker.
+- **Barns tab** — add/edit fair buildings or barn areas. Each row has a
+  stable `Barn ID`, display `Name`, species served, area/building, sort
+  order, and notes.
+- **Stalls tab** — maintain the available stall/pen inventory for each
+  barn. Each row belongs to a `Barn ID` and has a `Stall ID`, species,
+  label, status, and notes.
+- **Barn Layout tab** — assign each club/species to a `Barn ID`, set
+  `Pen Count`, `Stalls Used`, and `Location Notes`. These fields drive
+  the pen-count badge and the barn layout map shown below the species picker.
 - **Judges tab** — add/remove judges; set Active to N to hide one
   without deleting their row.
 - **Rubric tab** — change weights or hints. Total should stay 100.
@@ -87,12 +93,35 @@ What the PWA controls (no sheet edits):
 - Daily inspection schedule (Schedule tab is a mirror of the PWA's
   schedule view).
 
-## Adding a club/addition and pen counts
+## Adding barns, stalls, and club assignments
 
-Pen counts are intentionally kept in the **Barn Layout** tab instead of the
-Clubs tab, because a club can have different pen counts by species.
+Barn and stall management is intentionally spreadsheet-driven:
 
-To add a new club/addition:
+- **Barns** is the master list of buildings/areas.
+- **Stalls** is the available stall/pen inventory inside each barn.
+- **Barn Layout** assigns a club/species to a barn and a stall/pen range.
+
+To add a new barn or building area:
+
+1. In the **Barns** tab, add one row:
+   - `Barn ID` — short lowercase key with no spaces, e.g. `beef-north`
+   - `Name` — display name, e.g. `North Beef Barn`
+   - `Species (comma sep)` — species IDs served by this barn, e.g. `beef,dairy`
+   - `Area / Building` — broad fairgrounds area, e.g. `North barn`
+   - `Sort Order` — number used for display order
+   - `Notes` — optional
+
+To add/manage stall or pen inventory:
+
+1. In the **Stalls** tab, add one row per stall/pen/cage:
+   - `Barn ID` — must exactly match a Barns tab `Barn ID`
+   - `Stall ID` — stable key, e.g. `A10`
+   - `Species` — species ID, e.g. `beef`, `swine`, `sheep`
+   - `Label` — human label shown to staff, usually same as `Stall ID`
+   - `Status` — optional status such as `open`, `reserved`, or `closed`
+   - `Notes` — optional aisle/wall notes
+
+To add a new club/addition and assign pens:
 
 1. In the **Clubs** tab, add one row:
    - `ID` — short lowercase key with no spaces, e.g. `newclub`
@@ -104,19 +133,20 @@ To add a new club/addition:
 2. In the **Barn Layout** tab, add one row for each species the club has:
    - `Club ID` — must exactly match the Clubs tab `ID`
    - `Species` — must match the species ID, e.g. `beef`, `swine`, `sheep`
+   - `Barn ID` — must exactly match the Barns tab `Barn ID`
    - `Pen Count` — number shown on the app's pen badge
-   - `Stalls Used` — optional stall/pen range, e.g. `A10–A12`
-   - `Location Notes` — optional barn/aisle description
+   - `Stalls Used` — stall/pen range assigned to this club, e.g. `A10–A12`
+   - `Location Notes` — optional aisle/wall description
 3. On each judge phone, open the PWA and tap **Setup → Sync now**
-   or force-close/reopen the app. The new club and pen count should appear
-   under the selected species.
+   or force-close/reopen the app. The new barn, stall inventory, club,
+   and pen assignment should appear under the selected species.
 
 Example Barn Layout rows:
 
-| Club ID | Species | Pen Count | Stalls Used | Location Notes |
-|---|---:|---:|---|---|
-| newclub | beef | 3 | A10–A12 | North beef barn, west aisle |
-| newclub | swine | 2 | P27–P28 | Swine barn, east row |
+| Club ID | Species | Barn ID | Pen Count | Stalls Used | Location Notes |
+|---|---:|---|---:|---|---|
+| newclub | beef | beef-north | 3 | A10–A12 | West aisle |
+| newclub | swine | swine | 2 | P27–P28 | East row |
 
 ## Troubleshooting
 

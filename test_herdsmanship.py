@@ -54,6 +54,22 @@ class HerdsmanshipFeatureTests(unittest.TestCase):
         self.assertIn("Stalls Used", CODE_GS)
         self.assertIn("barnLayout", CODE_GS)
 
+    def test_apps_script_supports_barns_and_stalls_inventory_tabs(self):
+        expected_tabs_and_headers = [
+            "BARNS", "Barns", "Barn ID", "Area / Building", "Sort Order",
+            "STALLS", "Stalls", "Stall ID", "Status", "barns", "stalls",
+        ]
+        for text in expected_tabs_and_headers:
+            self.assertIn(text, CODE_GS)
+
+    def test_pwa_loads_and_explains_sheet_managed_barns_and_stalls(self):
+        expected_pwa_terms = [
+            "const BARNS", "const STALLS", "cfg.barns", "cfg.stalls",
+            "function barnFor", "function stallInventoryFor", "Barns tab", "Stalls tab",
+        ]
+        for text in expected_pwa_terms:
+            self.assertIn(text, INDEX)
+
     def test_prototype_banner_and_copy_are_removed(self):
         self.assertNotIn('class="demo-banner"', INDEX)
         self.assertNotIn("Prototype", INDEX)

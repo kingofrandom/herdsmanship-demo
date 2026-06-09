@@ -7,12 +7,14 @@
  * Copy the Web App URL into the PWA's Setup → Cloud Sync field.
  *
  * The script auto-creates these tabs on first call:
- *   Clubs, Barn Layout, Judges, Rubric, Species, Settings, Scores, Schedule
- * Edit Clubs/Barn Layout/Judges/Rubric on your laptop; PWA pulls on launch.
+ *   Clubs, Barns, Stalls, Barn Layout, Judges, Rubric, Species, Settings, Scores, Schedule
+ * Edit Clubs/Barns/Stalls/Barn Layout/Judges/Rubric on your laptop; PWA pulls on launch.
  */
 
 const TABS = {
   CLUBS:    'Clubs',
+  BARNS:    'Barns',
+  STALLS:   'Stalls',
   BARN_LAYOUT: 'Barn Layout',
   JUDGES:   'Judges',
   RUBRIC:   'Rubric',
@@ -80,30 +82,53 @@ function ensureSheets_() {
     ['bronsonck','Bronson Rustlers Clover Kids','Dee M…',                    'rabbit,poultry', 'Clover Kids — non-competing']
   ]);
 
-  seed(TABS.BARN_LAYOUT, ['Club ID','Species','Pen Count','Stalls Used','Location Notes'], [
-    ['anthon','beef',4,'A1–A4','North beef barn, west aisle'],
-    ['arlington','beef',3,'A5–A7','North beef barn, west aisle'],
-    ['bronson','beef',6,'B1–B6','North beef barn, center aisle'],
-    ['bryant','beef',3,'B7–B9','North beef barn, center aisle'],
-    ['grant','beef',2,'C1–C2','North beef barn, east aisle'],
-    ['lucky','beef',3,'C3–C5','North beef barn, east aisle'],
-    ['pierson','beef',4,'C6–C9','North beef barn, east aisle'],
-    ['rockbr','beef',2,'D1–D2','Overflow beef row'],
-    ['willow','beef',5,'D3–D7','Overflow beef row'],
-    ['anthon','sheep',3,'S1–S3','Sheep barn, north wall'],
-    ['banner','sheep',3,'S4–S6','Sheep barn, north wall'],
-    ['bronson','sheep',4,'S7–S10','Sheep barn, center row'],
-    ['goodluck','sheep',4,'S11–S14','Sheep barn, center row'],
-    ['lucky','sheep',3,'S15–S17','Sheep barn, south wall'],
-    ['pierson','sheep',4,'S18–S21','Sheep barn, south wall'],
-    ['anthon','swine',4,'P1–P4','Swine barn, west row'],
-    ['arlington','swine',3,'P5–P7','Swine barn, west row'],
-    ['bronson','swine',5,'P8–P12','Swine barn, center row'],
-    ['bryant','swine',3,'P13–P15','Swine barn, center row'],
-    ['grant','swine',2,'P16–P17','Swine barn, east row'],
-    ['pierson','swine',4,'P18–P21','Swine barn, east row'],
-    ['rockbr','swine',2,'P22–P23','Swine barn, east row'],
-    ['rockkee','swine',3,'P24–P26','Swine barn, east row']
+  seed(TABS.BARNS, ['Barn ID','Name','Species (comma sep)','Area / Building','Sort Order','Notes'], [
+    ['beef-north','North Beef Barn','beef,dairy','North barn',10,'Main beef and dairy stalling'],
+    ['sheep','Sheep Barn','sheep,goat','Small animal barn',20,'Sheep and goat pens'],
+    ['swine','Swine Barn','swine','East barn',30,'Swine pens'],
+    ['horse','Horse Barn','horse','Horse barn',40,'Horse stalls'],
+    ['small-animal','Rabbit & Poultry Barn','rabbit,poultry','Small animal barn',50,'Rabbit and poultry cages']
+  ]);
+
+  seed(TABS.STALLS, ['Barn ID','Stall ID','Species','Label','Status','Notes'], [
+    ['beef-north','A1','beef','A1','open','West aisle'],
+    ['beef-north','A2','beef','A2','open','West aisle'],
+    ['beef-north','A3','beef','A3','open','West aisle'],
+    ['beef-north','A4','beef','A4','open','West aisle'],
+    ['beef-north','B1','beef','B1','open','Center aisle'],
+    ['beef-north','B2','beef','B2','open','Center aisle'],
+    ['sheep','S1','sheep','S1','open','North wall'],
+    ['sheep','S2','sheep','S2','open','North wall'],
+    ['sheep','S3','sheep','S3','open','North wall'],
+    ['swine','P1','swine','P1','open','West row'],
+    ['swine','P2','swine','P2','open','West row'],
+    ['swine','P3','swine','P3','open','West row']
+  ]);
+
+  seed(TABS.BARN_LAYOUT, ['Club ID','Species','Barn ID','Pen Count','Stalls Used','Location Notes'], [
+    ['anthon','beef','beef-north',4,'A1–A4','West aisle'],
+    ['arlington','beef','beef-north',3,'A5–A7','West aisle'],
+    ['bronson','beef','beef-north',6,'B1–B6','Center aisle'],
+    ['bryant','beef','beef-north',3,'B7–B9','Center aisle'],
+    ['grant','beef','beef-north',2,'C1–C2','East aisle'],
+    ['lucky','beef','beef-north',3,'C3–C5','East aisle'],
+    ['pierson','beef','beef-north',4,'C6–C9','East aisle'],
+    ['rockbr','beef','beef-north',2,'D1–D2','Overflow beef row'],
+    ['willow','beef','beef-north',5,'D3–D7','Overflow beef row'],
+    ['anthon','sheep','sheep',3,'S1–S3','North wall'],
+    ['banner','sheep','sheep',3,'S4–S6','North wall'],
+    ['bronson','sheep','sheep',4,'S7–S10','Center row'],
+    ['goodluck','sheep','sheep',4,'S11–S14','Center row'],
+    ['lucky','sheep','sheep',3,'S15–S17','South wall'],
+    ['pierson','sheep','sheep',4,'S18–S21','South wall'],
+    ['anthon','swine','swine',4,'P1–P4','West row'],
+    ['arlington','swine','swine',3,'P5–P7','West row'],
+    ['bronson','swine','swine',5,'P8–P12','Center row'],
+    ['bryant','swine','swine',3,'P13–P15','Center row'],
+    ['grant','swine','swine',2,'P16–P17','East row'],
+    ['pierson','swine','swine',4,'P18–P21','East row'],
+    ['rockbr','swine','swine',2,'P22–P23','East row'],
+    ['rockkee','swine','swine',3,'P24–P26','East row']
   ]);
 
   seed(TABS.JUDGES, ['Name','Active (Y/N)','Notes'], [
@@ -168,9 +193,28 @@ function readConfig_() {
     species: String(r['Species (comma sep)'] || '').split(',').map(s=>s.trim()).filter(Boolean)
   })).filter(c => c.id && c.name);
 
+  const barns = rows(TABS.BARNS).map(r => ({
+    id: String(r['Barn ID'] || '').trim(),
+    name: String(r.Name || '').trim(),
+    species: String(r['Species (comma sep)'] || '').split(',').map(s=>s.trim()).filter(Boolean),
+    area: String(r['Area / Building'] || '').trim(),
+    sort: Number(r['Sort Order']) || 0,
+    notes: String(r.Notes || '').trim()
+  })).filter(b => b.id && b.name);
+
+  const stalls = rows(TABS.STALLS).map(r => ({
+    barnId: String(r['Barn ID'] || '').trim(),
+    stallId: String(r['Stall ID'] || '').trim(),
+    species: String(r.Species || '').trim(),
+    label: String(r.Label || r['Stall ID'] || '').trim(),
+    status: String(r.Status || '').trim(),
+    notes: String(r.Notes || '').trim()
+  })).filter(s => s.barnId && s.stallId);
+
   const barnLayout = rows(TABS.BARN_LAYOUT).map(r => ({
     clubId: String(r['Club ID'] || '').trim(),
     species: String(r.Species || '').trim(),
+    barnId: String(r['Barn ID'] || '').trim(),
     pens: Number(r['Pen Count']) || 0,
     stalls: String(r['Stalls Used'] || '').trim(),
     location: String(r['Location Notes'] || '').trim()
@@ -190,7 +234,7 @@ function readConfig_() {
   const settings = {};
   rows(TABS.SETTINGS).forEach(r => { if (r.Key) settings[String(r.Key)] = r.Value; });
 
-  return { clubs, barnLayout, judges, rubric, settings };
+  return { clubs, barns, stalls, barnLayout, judges, rubric, settings };
 }
 
 function readScores_() {
