@@ -87,6 +87,37 @@ What the PWA controls (no sheet edits):
 - Daily inspection schedule (Schedule tab is a mirror of the PWA's
   schedule view).
 
+## Adding a club/addition and pen counts
+
+Pen counts are intentionally kept in the **Barn Layout** tab instead of the
+Clubs tab, because a club can have different pen counts by species.
+
+To add a new club/addition:
+
+1. In the **Clubs** tab, add one row:
+   - `ID` — short lowercase key with no spaces, e.g. `newclub`
+   - `Name` — display name shown in the app
+   - `Leaders` — optional leader/contact text
+   - `Species (comma sep)` — species IDs this club should appear under,
+     e.g. `beef,swine,sheep`
+   - `Notes` — optional
+2. In the **Barn Layout** tab, add one row for each species the club has:
+   - `Club ID` — must exactly match the Clubs tab `ID`
+   - `Species` — must match the species ID, e.g. `beef`, `swine`, `sheep`
+   - `Pen Count` — number shown on the app's pen badge
+   - `Stalls Used` — optional stall/pen range, e.g. `A10–A12`
+   - `Location Notes` — optional barn/aisle description
+3. On each judge phone, open the PWA and tap **Setup → Sync now**
+   or force-close/reopen the app. The new club and pen count should appear
+   under the selected species.
+
+Example Barn Layout rows:
+
+| Club ID | Species | Pen Count | Stalls Used | Location Notes |
+|---|---:|---:|---|---|
+| newclub | beef | 3 | A10–A12 | North beef barn, west aisle |
+| newclub | swine | 2 | P27–P28 | Swine barn, east row |
+
 ## Troubleshooting
 
 - **"⚠ Could not reach sheet"** when tapping Sync now → the URL is
