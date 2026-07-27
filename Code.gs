@@ -8,7 +8,7 @@
  *
  * The script auto-creates these tabs on first call:
  *   Clubs, Barns, Stalls, Barn Layout, Judges, Rubric, Species, Settings, Scores, Schedule
- * Edit Clubs/Barns/Stalls/Barn Layout/Judges/Rubric on your laptop; PWA pulls on launch.
+ * Edit Clubs/Barns/Stalls/Barn Layout/Judges/Rubric/Species on your laptop; PWA pulls on launch.
  */
 
 const TABS = {
@@ -24,28 +24,60 @@ const TABS = {
   SCHEDULE: 'Schedule',
 };
 
+const META = {
+  DATASET_ID: 'HSM_DATASET_ID',
+  SCORE_GENERATION: 'HSM_SCORE_GENERATION',
+  RESET_PENDING_ID: 'HSM_RESET_PENDING_ID',
+  LAST_RESET_ID: 'HSM_LAST_RESET_ID',
+};
+const ID_RE = /^[a-z0-9_-]{1,50}$/;
+const PASS_RE = /^d[1-4](am|pm)$/;
+
 // ---------- HTTP entry points ----------
 function doGet(e) {
   ensureSheets_();
   const action = (e && e.parameter && e.parameter.action) || 'config';
   if (action === 'config') return json_({ok:true, config: readConfig_()});
-  if (action === 'scores') return json_({ok:true, scores: readScores_()});
-  return json_({ok:false, error:'unknown action'});
+  if (action === 'state') return json_({ok:true, state:readState_()});
+  if (action === 'scores') {
+    const state = readState_();
+    return json_({ok:true, scores:state.scores, datasetId:state.datasetId, generation:state.generation});
+  }
+  return json_({ok:false, error:'unknown_action'});
 }
 
 function doPost(e) {
   ensureSheets_();
   let body = {};
   try { body = JSON.parse(e.postData.contents || '{}'); }
-  catch(err) { return json_({ok:false, error:'bad json'}); }
-  const action = body.action || 'snapshot';
-  if (action === 'snapshot') {
-    writeScores_(body.scores || {});
-    writeSchedule_(body.schedule || {});
-    writeMeta_(body.judge, body.pass);
-    return json_({ok:true, wrote: Object.keys(body.scores||{}).length});
+  catch(err) { return json_({ok:false, error:'bad_json'}); }
+
+  const action = body.action || '';
+  if (action === 'snapshot' || action === 'updateSchedule') {
+    return json_({ok:false, error:'client_upgrade_required'});
   }
-  return json_({ok:false, error:'unknown action'});
+  if (action === 'upsertScore') return json_(upsertScore_(body));
+  if (action === 'upsertSchedule') return json_(upsertSchedule_(body));
+  return json_({ok:false, error:'unknown_action'});
+}
+
+// Destructive shared resets are available only to a Sheet owner/editor through
+// this menu. They are intentionally not exposed by doPost().
+function onOpen() {
+  SpreadsheetApp.getUi().createMenu('Herdsmanship Admin')
+    .addItem('Clear all scores…', 'resetAllScores').addToUi();
+}
+
+function resetAllScores() {
+  ensureSheets_();
+  const ui = SpreadsheetApp.getUi();
+  const answer = ui.alert('Clear every Herdsmanship score?',
+    'This resets shared scores for every judge. The schedule is preserved.',
+    ui.ButtonSet.YES_NO);
+  if (answer !== ui.Button.YES) return {ok:false, cancelled:true};
+  const result = resetAllScores_();
+  ui.alert(`Cleared ${result.cleared} score row${result.cleared===1?'':'s'}.`);
+  return result;
 }
 
 // ---------- Sheet bootstrap ----------
@@ -63,7 +95,7 @@ function ensureSheets_() {
 
   seed(TABS.CLUBS, ['ID','Name','Leaders','Species (comma sep)','Notes'], [
     ['anthon',   'Anthon Advancers',         'Tim Hoy & Tyler H…',          'beef,sheep,swine,goat', ''],
-    ['arlington','Arlington Future Farmers', 'Ashley McC…',                  'beef,swine,dairy', ''],
+    ['arlington','Arlington Future Farmers', 'Ashley McC…',                  'beef,swine,dairy,llama', ''],
     ['banner',   'Banner Boosters',          'Melissa Hoogendyk',            'sheep,goat,rabbit', ''],
     ['bgh',      'Boys & Girls Home',        'Christine Craig',              'rabbit,poultry', ''],
     ['bronson',  'Bronson Rustlers',         'Dee McKenna & Liz…',           'beef,sheep,swine,dairy,goat,horse', ''],
@@ -77,7 +109,7 @@ function ensureSheets_() {
     ['rockbr',   'Rock Branch Producers',    'Karen Havli…',                 'beef,swine', ''],
     ['rockkee',  'Rock-Kee-Union',           'Nicole Huisinga, As…',         'sheep,swine,goat', ''],
     ['sunday',   'Sunday Funday',            'Christine Craig',              'rabbit,poultry', ''],
-    ['willow',   'Willow Workers',           'Jamie Johnson & Ni…',          'beef,dairy,goat,horse,poultry', ''],
+    ['willow',   'Willow Workers',           'Jamie Johnson & Ni…',          'beef,dairy,goat,horse,poultry,llama', ''],
     ['innov',    'Woodbury Innovators',      'Adrienne Dun…',                'swine,rabbit', ''],
     ['bronsonck','Bronson Rustlers Clover Kids','Dee M…',                    'rabbit,poultry', 'Clover Kids — non-competing']
   ]);
@@ -155,7 +187,8 @@ function ensureSheets_() {
     ['goat','Goat','🐐'],
     ['horse','Horse','🐴'],
     ['rabbit','Rabbit','🐇'],
-    ['poultry','Poultry','🐓']
+    ['poultry','Poultry','🐓'],
+    ['llama','Llama and Alpaca','🦙']
   ]);
 
   seed(TABS.SETTINGS, ['Key','Value'], [
@@ -171,8 +204,11 @@ function ensureSheets_() {
     ['Supt: Ashley Diediker','(712) 253-5087']
   ]);
 
-  seed(TABS.SCORES, ['Club','Species','Pass','Judge','Score','Clean','Animals','Security','Educ','Feed','Exhib','Note','LastUpdated'], []);
-  seed(TABS.SCHEDULE, ['Pass','Species','Judge'], []);
+  seed(TABS.SCORES, ['Club','Species','Pass','Judge','Score','Clean','Animals','Security','Educ','Feed','Exhib','Note','LastUpdated','Revision','OpId'], []);
+  seed(TABS.SCHEDULE, ['Pass','Species','Judge','Revision','OpId'], []);
+  ensureColumns_(TABS.SCORES, ['Revision','OpId']);
+  ensureColumns_(TABS.SCHEDULE, ['Revision','OpId']);
+  syncMetadata_();
 }
 
 // ---------- Read ----------
@@ -231,74 +267,275 @@ function readConfig_() {
     hint: String(r.Hint || '').trim()
   })).filter(c => c.key && c.name);
 
+  const species = rows(TABS.SPECIES).map(r => ({
+    id: String(r.ID || '').trim(),
+    name: String(r.Name || '').trim(),
+    em: String(r.Emoji || '🐾').trim() || '🐾'
+  })).filter(s => s.id && s.name);
+
   const settings = {};
   rows(TABS.SETTINGS).forEach(r => { if (r.Key) settings[String(r.Key)] = r.Value; });
 
-  return { clubs, barns, stalls, barnLayout, judges, rubric, settings };
+  return { clubs, barns, stalls, barnLayout, judges, rubric, species, settings };
 }
 
 function readScores_() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sh = ss.getSheetByName(TABS.SCORES); if (!sh) return {};
-  const v = sh.getDataRange().getValues(); if (v.length < 2) return {};
+  const values = sh.getDataRange().getValues(); if (values.length < 2) return {};
   const out = {};
-  for (let i=1; i<v.length; i++){
-    const [club, sp, pass, judge, score, c1,c2,c3,c4,c5,c6, note] = v[i];
+  for (let i=1; i<values.length; i++){
+    const [club, sp, pass, judge, score, c1,c2,c3,c4,c5,c6, note, updated, revision] = values[i];
     if (!club || !sp || !pass) continue;
     out[`${club}|${sp}|${pass}`] = {
       r:{clean:+c1, animals:+c2, security:+c3, educ:+c4, feed:+c5, exhib:+c6},
-      note: String(note||''),
-      judge: String(judge||'')
+      note:String(note||''),
+      judge:String(judge||''),
+      revision:String(revision || legacyRevision_(updated, i))
     };
   }
   return out;
 }
 
-// ---------- Write ----------
-function writeScores_(scores) {
+function readSchedule_() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sh = ss.getSheetByName(TABS.SCORES);
-  const now = new Date();
-  const rows = [];
-  Object.keys(scores).forEach(k => {
-    const [club, sp, pass] = k.split('|');
-    const e = scores[k] || {}; const r = e.r || {};
-    const total = Math.round(
-      ((r.clean||0)/5)*20 + ((r.animals||0)/5)*20 + ((r.security||0)/5)*15 +
-      ((r.educ||0)/5)*15 + ((r.feed||0)/5)*10 + ((r.exhib||0)/5)*20
-    );
-    rows.push([club, sp, pass, e.judge||'', total,
-      r.clean||'', r.animals||'', r.security||'', r.educ||'', r.feed||'', r.exhib||'',
-      e.note||'', now]);
-  });
-  // overwrite — sheet is a mirror, PWA is source of truth for scores
-  if (sh.getLastRow() > 1) sh.getRange(2,1,sh.getLastRow()-1, sh.getLastColumn()).clearContent();
-  if (rows.length) sh.getRange(2,1,rows.length, rows[0].length).setValues(rows);
+  const sh = ss.getSheetByName(TABS.SCHEDULE); if (!sh) return {};
+  const v = sh.getDataRange().getValues(); if (v.length < 2) return {};
+  const out = {};
+  for (let i=1; i<v.length; i++) {
+    const [pass, sp, judge] = v[i];
+    if (pass && sp && judge) out[`${pass}|${sp}`] = String(judge);
+  }
+  return out;
 }
 
-function writeSchedule_(schedule) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sh = ss.getSheetByName(TABS.SCHEDULE);
-  const rows = [];
-  Object.keys(schedule).forEach(k => {
-    const [pass, sp] = k.split('|');
-    rows.push([pass, sp, schedule[k] || '']);
+function readState_() {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(5000);
+  try {
+    completePendingReset_();
+    const meta = syncMetadata_();
+    return {
+      scores:readScores_(),
+      schedule:readSchedule_(),
+      datasetId:meta.datasetId,
+      generation:meta.generation,
+      lastResetId:meta.lastResetId
+    };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// ---------- Write ----------
+function upsertScore_(body) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(5000);
+  try {
+    completePendingReset_();
+    const meta = syncMetadata_();
+    const identityError = validateIdentity_(body, meta, true);
+    if (identityError) return identityError;
+    const valid = validateScorePayload_(body);
+    if (!valid.ok) return valid;
+
+    const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(TABS.SCORES);
+    const values = sh.getDataRange().getValues();
+    const matches = [];
+    for (let i=1; i<values.length; i++) {
+      if (scoreKeyFromRow_(values[i]) === body.key) matches.push(i + 1);
+    }
+    const currentRow = matches.length ? values[matches[matches.length - 1] - 1] : null;
+    if (currentRow && String(currentRow[14] || '') === body.opId) {
+      return {ok:true, opId:body.opId, key:body.key, revision:String(currentRow[13] || '')};
+    }
+
+    const currentRevision = currentRow
+      ? String(currentRow[13] || legacyRevision_(currentRow[12], matches[matches.length - 1] - 1))
+      : null;
+    const expectedRevision = body.expectedRevision == null ? null : String(body.expectedRevision);
+    if (currentRevision !== expectedRevision) {
+      return {ok:false, error:'score_conflict', key:body.key, currentRevision};
+    }
+
+    const revision = Utilities.getUuid();
+    const row = scoreRow_(body.key, body.entry, valid.config.rubric, revision, body.opId);
+    matches.sort((a,b)=>b-a).forEach(rowNumber=>sh.deleteRow(rowNumber));
+    sh.appendRow(row);
+    writeMeta_(body.entry.judge, valid.parts[2]);
+    return {ok:true, opId:body.opId, key:body.key, revision,
+      datasetId:meta.datasetId, generation:meta.generation};
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function upsertSchedule_(body) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(5000);
+  try {
+    completePendingReset_();
+    const meta = syncMetadata_();
+    const identityError = validateIdentity_(body, meta, false);
+    if (identityError) return identityError;
+
+    const parts = String(body.key || '').split('|');
+    const config = readConfig_();
+    const speciesIds = new Set(config.species.map(x=>x.id));
+    const judge = String(body.judge || '');
+    if (parts.length !== 2 || !PASS_RE.test(parts[0]) || !ID_RE.test(parts[1]) || !speciesIds.has(parts[1])) {
+      return {ok:false, error:'invalid_schedule_key'};
+    }
+    if (judge && !config.judges.includes(judge)) return {ok:false, error:'invalid_judge'};
+
+    const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(TABS.SCHEDULE);
+    const values = sh.getDataRange().getValues();
+    const matches = [];
+    for (let i=1; i<values.length; i++) {
+      if (`${values[i][0]}|${values[i][1]}` === body.key) matches.push(i + 1);
+    }
+    const currentRow = matches.length ? values[matches[matches.length - 1] - 1] : null;
+    if (currentRow && String(currentRow[4] || '') === body.opId) {
+      return {ok:true, opId:body.opId, key:body.key, revision:String(currentRow[3] || '')};
+    }
+
+    const revision = Utilities.getUuid();
+    matches.sort((a,b)=>b-a).forEach(rowNumber=>sh.deleteRow(rowNumber));
+    if (judge) sh.appendRow([parts[0], parts[1], judge, revision, body.opId]);
+    writeMeta_('', parts[0]);
+    return {ok:true, opId:body.opId, key:body.key, revision, datasetId:meta.datasetId};
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function validateIdentity_(body, meta, requireGeneration) {
+  if (!validOpId_(body.opId)) return {ok:false, error:'invalid_op_id'};
+  if (String(body.datasetId || '') !== meta.datasetId) {
+    return {ok:false, error:'wrong_dataset', datasetId:meta.datasetId, generation:meta.generation};
+  }
+  if (requireGeneration && Number(body.generation) !== meta.generation) {
+    return {ok:false, error:'stale_generation', datasetId:meta.datasetId, generation:meta.generation};
+  }
+  return null;
+}
+
+function validateScorePayload_(body) {
+  const parts = String(body.key || '').split('|');
+  if (parts.length !== 3 || !parts.every(part=>ID_RE.test(part)) || !PASS_RE.test(parts[2])) {
+    return {ok:false, error:'invalid_score_key'};
+  }
+  const config = readConfig_();
+  const club = config.clubs.find(x=>x.id===parts[0]);
+  const speciesIds = new Set(config.species.map(x=>x.id));
+  const entry = body.entry || {};
+  const note = String(entry.note || '');
+  if (!club || !speciesIds.has(parts[1]) || !club.species.includes(parts[1])) {
+    return {ok:false, error:'unknown_club_species'};
+  }
+  if (!config.judges.includes(String(entry.judge || ''))) return {ok:false, error:'invalid_judge'};
+  if (note.length > 1000 || /^[=+@]/.test(note) || /[\u0000-\u0008\u000B\u000C\u000E-\u001F]/.test(note)) {
+    return {ok:false, error:'invalid_note'};
+  }
+  if (!entry.r || !config.rubric.every(item=>Number.isInteger(entry.r[item.key]) && entry.r[item.key]>=1 && entry.r[item.key]<=5)) {
+    return {ok:false, error:'invalid_ratings'};
+  }
+  return {ok:true, parts, config};
+}
+
+function scoreRow_(key, entry, rubric, revision, opId) {
+  const [club, sp, pass] = key.split('|');
+  const r = entry.r;
+  const total = Math.round(rubric.reduce((sum,item)=>sum + (r[item.key]/5)*item.wt, 0));
+  return [club, sp, pass, entry.judge, total,
+    r.clean, r.animals, r.security, r.educ, r.feed, r.exhib,
+    String(entry.note||''), new Date(), revision, opId];
+}
+
+function resetAllScores_() {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(5000);
+  try {
+    const meta = syncMetadata_();
+    const resetId = Utilities.getUuid();
+    PropertiesService.getScriptProperties().setProperties({
+      [META.RESET_PENDING_ID]:resetId,
+      [META.SCORE_GENERATION]:String(meta.generation + 1)
+    });
+    const cleared = completePendingReset_();
+    const next = syncMetadata_();
+    return {ok:true, cleared, datasetId:next.datasetId,
+      generation:next.generation, resetId};
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function completePendingReset_() {
+  const props = PropertiesService.getScriptProperties();
+  const resetId = props.getProperty(META.RESET_PENDING_ID);
+  if (!resetId) return 0;
+  const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(TABS.SCORES);
+  const cleared = Math.max(0, sh.getLastRow() - 1);
+  if (cleared) sh.getRange(2,1,cleared,sh.getLastColumn()).clearContent();
+  props.setProperty(META.LAST_RESET_ID, resetId);
+  props.deleteProperty(META.RESET_PENDING_ID);
+  setSetting_('Last Score Reset', new Date());
+  return cleared;
+}
+
+function syncMetadata_() {
+  const props = PropertiesService.getScriptProperties();
+  let datasetId = props.getProperty(META.DATASET_ID);
+  let generation = Number(props.getProperty(META.SCORE_GENERATION));
+  if (!datasetId) {
+    datasetId = Utilities.getUuid();
+    props.setProperty(META.DATASET_ID, datasetId);
+  }
+  if (!Number.isInteger(generation) || generation < 1) {
+    generation = 1;
+    props.setProperty(META.SCORE_GENERATION, '1');
+  }
+  return {datasetId, generation,
+    lastResetId:props.getProperty(META.LAST_RESET_ID) || ''};
+}
+
+function ensureColumns_(sheetName, requiredHeaders) {
+  const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
+  const width = Math.max(1, sh.getLastColumn());
+  const headers = sh.getRange(1,1,1,width).getValues()[0].map(String);
+  requiredHeaders.forEach(header=>{
+    if (!headers.includes(header)) {
+      headers.push(header);
+      sh.getRange(1,headers.length).setValue(header);
+    }
   });
-  if (sh.getLastRow() > 1) sh.getRange(2,1,sh.getLastRow()-1, sh.getLastColumn()).clearContent();
-  if (rows.length) sh.getRange(2,1,rows.length, rows[0].length).setValues(rows);
+}
+
+function scoreKeyFromRow_(row) { return `${row[0]}|${row[1]}|${row[2]}`; }
+function validOpId_(value) { return /^[A-Za-z0-9_-]{8,100}$/.test(String(value || '')); }
+function legacyRevision_(updated, index) {
+  const stamp = updated instanceof Date ? updated.getTime() : new Date(updated || 0).getTime();
+  return `legacy-${index}-${Number.isFinite(stamp) ? stamp : 0}`;
+}
+
+function setSetting_(key, value) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sh = ss.getSheetByName(TABS.SETTINGS);
+  const data = sh.getDataRange().getValues();
+  for (let i=1; i<data.length; i++) {
+    if (String(data[i][0]) === key) {
+      sh.getRange(i+1,2).setValue(value);
+      return;
+    }
+  }
+  sh.appendRow([key,value]);
 }
 
 function writeMeta_(judge, pass) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sh = ss.getSheetByName(TABS.SETTINGS);
-  const setKV = (k, v) => {
-    const data = sh.getDataRange().getValues();
-    for (let i=1; i<data.length; i++) if (data[i][0] === k) { sh.getRange(i+1,2).setValue(v); return; }
-    sh.appendRow([k,v]);
-  };
-  if (judge) setKV('Last Judge', judge);
-  if (pass)  setKV('Last Pass',  pass);
-  setKV('Last Sync', new Date());
+  if (judge) setSetting_('Last Judge', judge);
+  if (pass) setSetting_('Last Pass', pass);
+  setSetting_('Last Sync', new Date());
 }
 
 // ---------- helpers ----------

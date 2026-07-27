@@ -5,6 +5,7 @@ These tests intentionally inspect the checked-in HTML/Apps Script source because
 this prototype is a single-file PWA plus Apps Script backend, not a bundled app.
 """
 from pathlib import Path
+import subprocess
 import unittest
 
 ROOT = Path(__file__).resolve().parent
@@ -75,6 +76,87 @@ class HerdsmanshipFeatureTests(unittest.TestCase):
         self.assertNotIn("Prototype", INDEX)
         self.assertNotIn("tap around freely", INDEX)
         self.assertNotIn("placeholders", INDEX)
+
+    def test_species_sheet_completes_read_response_apply_path(self):
+        self.assertIn("const species = rows(TABS.SPECIES)", CODE_GS)
+        self.assertIn("return { clubs, barns, stalls, barnLayout, judges, rubric, species, settings }", CODE_GS)
+        self.assertIn("Array.isArray(cfg.species)", INDEX)
+        self.assertIn("SPECIES.length = 0", INDEX)
+        self.assertIn('{id:"llama", name:"Llama and Alpaca", em:"🦙"}', INDEX)
+
+    def test_production_first_load_is_empty_and_sample_data_is_explicit(self):
+        self.assertIn('return {mode:"live", judge:"Pat M.", pass:"d2pm", scores:{}, schedule:{}};', INDEX)
+        load_start = INDEX.index("function load(){")
+        load_end = INDEX.index("function createSampleState", load_start)
+        self.assertNotIn("seedPass(", INDEX[load_start:load_end])
+        self.assertIn("function createSampleState", INDEX)
+        self.assertIn("function restoreSampleData", INDEX)
+
+    def test_sample_data_has_a_persistent_local_only_mode(self):
+        self.assertIn("function exitSampleMode", INDEX)
+        self.assertIn("function isSampleMode", INDEX)
+        self.assertIn("S.mode='sample'", INDEX)
+        self.assertIn("Sample mode · local only", INDEX)
+        self.assertIn("if(isSampleMode()) return;", INDEX)
+        self.assertNotIn("function clearAllScores", INDEX)
+
+    def test_backend_uses_protected_metadata_and_owner_only_reset(self):
+        for text in [
+            "function resetAllScores",
+            "function onOpen",
+            "Herdsmanship Admin",
+            "PropertiesService.getScriptProperties()",
+            "HSM_DATASET_ID",
+            "HSM_SCORE_GENERATION",
+            "function completePendingReset_",
+            "LockService.getScriptLock()",
+        ]:
+            self.assertIn(text, CODE_GS)
+        self.assertNotIn("action === 'resetScores'", CODE_GS)
+        self.assertIn("client_upgrade_required", CODE_GS)
+
+    def test_backend_validates_idempotent_revisioned_writes(self):
+        for text in [
+            "function upsertScore_",
+            "function upsertSchedule_",
+            "score_conflict",
+            "invalid_ratings",
+            "expectedRevision",
+            "body.opId",
+            "Utilities.getUuid()",
+        ]:
+            self.assertIn(text, CODE_GS)
+        self.assertNotIn("writeScores_(body.scores || {})", CODE_GS)
+
+    def test_frontend_uses_identity_scoped_immutable_operations(self):
+        for text in [
+            "?action=state",
+            "function applyRemoteState",
+            "function queueScoreUpsert",
+            "function queueScheduleUpsert",
+            "action:'upsertScore'",
+            "action:'upsertSchedule'",
+            'const SYNC_LS = "hsm_sync_v2"',
+            "datasetId:st.datasetId",
+            "opId:newOpId()",
+            "latest.queue = latest.queue.filter(x=>x.opId!==item.opId)",
+            "recoveryReason",
+        ]:
+            self.assertIn(text, INDEX)
+        self.assertNotIn("latest.queue.shift()", INDEX)
+        self.assertNotIn("action:'updateSchedule'", INDEX)
+        self.assertNotIn("payload:{judge:S.judge, pass:S.pass, scores:S.scores", INDEX)
+
+    def test_runtime_sync_contract(self):
+        result = subprocess.run(
+            ["node", "test_sync_runtime.js"],
+            cwd=ROOT,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("Runtime sync tests passed", result.stdout)
 
 
 if __name__ == "__main__":

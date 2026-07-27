@@ -10,10 +10,11 @@ in **your** Google Drive.
   with tabs: Clubs, Barns, Stalls, Barn Layout, Judges, Rubric, Species, Settings, Scores, Schedule.
 - A web app URL (long, ugly string) — paste it into the PWA's Setup
   screen on each judge's phone.
-- Edits to Clubs / Barns / Stalls / Barn Layout / Judges / Rubric you make in the sheet show up in
+- Edits to Clubs / Barns / Stalls / Barn Layout / Judges / Rubric / Species you make in the sheet show up in
   the PWA the next time a judge opens it.
-- Scores entered in the PWA appear in the Scores tab within seconds
-  (or get queued offline and sync on the next save when signal returns).
+- Scores entered in the PWA are upserted one record at a time into the Scores tab within seconds
+  (or get queued offline and sync when signal returns). Protected dataset/revision metadata keeps
+  queued operations tied to the correct Sheet and prevents stale phones from restoring cleared data.
 
 ## Step 1 — Create the sheet
 
@@ -36,6 +37,8 @@ in **your** Google Drive.
    normal Google warning for any script you wrote yourself.)
 6. Go back to the sheet — you should now see the 10 tabs filled with
    the Woodbury clubs, barns, stalls, barn layout, rubric, etc.
+7. Reload the Sheet once. A **Herdsmanship Admin** menu appears for owner/editor-only
+   shared-score resets. The public Web App endpoint cannot perform this destructive action.
 
 ## Step 3 — Deploy as a Web App
 
@@ -61,9 +64,9 @@ in **your** Google Drive.
 2. Tap **Setup** (bottom right).
 3. Scroll to **Cloud sync · Google Sheet**.
 4. Paste the URL into the field.
-5. Tap **Save URL** — it'll auto-pull the config from the sheet and
-   push the current local scores. The badge should change to
-   **✓ Synced** and Last sync should show the current time.
+5. Tap **Save URL** — it auto-pulls the current configuration, shared scores,
+   schedule, protected dataset identity, and score generation. The badge should change
+   to **✓ Synced** and Last sync should show the current time.
 6. Repeat step 1–5 on every judge's phone. They all paste the same URL.
 
 ## Step 5 — Hand off to Jamie
@@ -85,13 +88,17 @@ What Jamie controls from the sheet:
 - **Judges tab** — add/remove judges; set Active to N to hide one
   without deleting their row.
 - **Rubric tab** — change weights or hints. Total should stay 100.
-- **Settings tab** — fair name, year, etc.
+- **Species tab** — add or rename animal categories. `ID` is the stable lowercase key used by
+  Clubs, Barns, Stalls, Barn Layout, Scores, and Schedule; `Name` and `Emoji` control the app label.
+  For example: `llama` / `Llama and Alpaca` / `🦙`.
+- **Settings tab** — fair name, year, superintendent details, and operational timestamps.
+  Dataset identity and score generation are protected Script Properties, not editable Sheet cells.
 
 What the PWA controls (no sheet edits):
 
 - Per-shift "I'm Judge X, Pass Y" picker.
-- Daily inspection schedule (Schedule tab is a mirror of the PWA's
-  schedule view).
+- Daily inspection schedule. Each changed pass/species slot is written independently,
+  so two devices editing different slots do not replace one another's work.
 
 ## Adding barns, stalls, and club assignments
 
@@ -157,13 +164,23 @@ Example Barn Layout rows:
 - **Edits to the sheet not showing up in the PWA** → Pull happens on
   app launch and on tap of "Sync now". Have the judge force-close
   and reopen the app, or tap Sync now.
-- **Multiple judges scoring the same club/species/pass** → the
-  current backend is last-write-wins. If you need per-judge
-  attribution we can add it; tell Jason.
-- **Want a fresh start mid-fair** → in the sheet, clear the Scores
-  tab (keep the header row). Then in the PWA tap Setup → Reset demo
-  data on every phone. (Or skip the PWA reset and just let it
-  overwrite — but every phone's local copy will keep its scores.)
+- **Multiple judges scoring the same club/species/pass** → the backend detects a revision
+  conflict instead of silently overwriting the other judge. Tap **Needs review** in Setup
+  to see/copy details; unrelated records continue syncing normally.
+- **Want a fresh start** → first make sure the latest `Code.gs` is deployed. In the
+  Google Sheet use **Herdsmanship Admin → Clear all scores…**. The owner-only action
+  clears Scores and advances the protected generation; stale/offline score changes move
+  to **Needs review** when devices reconnect. Do not manually clear the Scores tab.
+- **Want sample/demo data** → use **Setup → Restore sample data on this device**.
+  A visible Sample mode banner remains across reloads. Sample scores and schedule edits
+  never enter the sync queue; tap **Return to live data** before syncing.
+- **Needs review is nonzero** → tap the row to see why an operation was quarantined
+  (wrong Sheet, stale reset generation, record conflict, or invalid data) and copy the
+  preserved recovery details. After reviewing/copying, use **Discard reviewed local changes**
+  to clear the recovery list before changing the backend URL or re-entering the score.
+- **“⚠ Sync issue” after updating the PWA** → deploy the latest `Code.gs` as a new
+  Apps Script version. The updated client intentionally refuses the old whole-sheet
+  snapshot protocol.
 
 ## Re-deploying after editing Code.gs
 

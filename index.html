@@ -189,6 +189,8 @@
   .toast{position:fixed; bottom:88px; left:50%; transform:translateX(-50%) translateY(20px); background:var(--ink); color:#fff; padding:12px 18px; border-radius:12px; font-weight:600; font-size:14.5px; opacity:0; pointer-events:none; transition:all .25s; z-index:50; white-space:nowrap; box-shadow:0 8px 24px rgba(0,0,0,.25); display:flex; align-items:center; gap:8px;}
   .toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
   .offline-banner{background:var(--warn-bg); color:var(--warn); font-size:12px; font-weight:600; text-align:center; padding:5px; border-bottom:1px solid #f0deb8;}
+  .sample-banner{background:#e9f0ff;color:#244b8f;border-bottom-color:#c8d8f4;display:flex;align-items:center;justify-content:center;gap:9px;padding:7px 10px;}
+  .sample-banner button{border:1px solid #8da9d8;background:#fff;color:#244b8f;border-radius:999px;padding:4px 9px;font-weight:700;font-size:11px;}
   @media print {
     nav, header, .save-bar, .photo-row, .note-wrap, .toast { display:none !important; }
     .phone { box-shadow:none; max-width:100%; }
@@ -214,6 +216,7 @@
     </div>
   </header>
   <div class="offline-banner" id="offBanner" style="display:none;">⚠ Offline — scores saved on this phone, will sync when signal returns</div>
+  <div class="offline-banner sample-banner" id="sampleBanner" style="display:none;">🧪 Sample mode · local only <button onclick="exitSampleMode()">Return to live data</button></div>
 
   <main>
     <section class="view active" id="view-score">
@@ -319,6 +322,8 @@
         </div>
         <div class="row"><span class="lab">Last sync</span><span class="val" id="lastSyncTxt">Never</span></div>
         <div class="row"><span class="lab">Queued (unsynced)</span><span class="val" id="queuedTxt">0</span></div>
+        <div class="row" onclick="showRecovery()"><span class="lab">Needs review <small style="color:var(--muted)">(tap for details)</small></span><span class="val" id="recoveryTxt">0</span></div>
+        <div class="row" id="recoveryClearRow" style="display:none;" onclick="clearRecovery()"><span class="lab" style="color:var(--danger)">Discard reviewed local changes</span><span class="val">×</span></div>
       </div>
       <div class="hint">One-time setup: in your Google Drive, create a sheet → Extensions → Apps Script → paste the code from SETUP.md → Deploy as Web App → paste the URL here. Scores sync to the sheet when online; held locally when offline and retried on the next save.</div>
 
@@ -337,10 +342,11 @@
         <div class="row"><span class="lab">Ashley Diediker</span><a class="val" href="tel:7122535087" style="color:var(--green-d);text-decoration:none;font-weight:600;">(712) 253-5087</a></div>
       </div>
 
-      <h2 class="sec"><span>Demo</span></h2>
+      <h2 class="sec"><span>Data management</span></h2>
       <div class="panel">
-        <div class="row" onclick="resetDemo()"><span class="lab" style="color:var(--danger)">Reset demo data</span><span class="val">↺</span></div>
+        <div class="row" onclick="isSampleMode()?exitSampleMode():restoreSampleData()"><span class="lab" id="sampleActionLabel">Restore sample data on this device</span><span class="val">🧪</span></div>
       </div>
+      <div class="hint">Sample mode is visibly marked, stays local, and cannot sync. Shared score resets are owner-only: use <b>Herdsmanship Admin → Clear all scores…</b> in the Google Sheet.</div>
     </section>
   </main>
 
@@ -382,18 +388,19 @@ const PASSES = [
 ];
 const QUICK = ["Bedding dry & clean","Stall cards incomplete","Refill water","Excellent grooming","Aisle blocked","Manure not hauled","Great cooperation","Animals not secured"];
 const SPECIES = [
-  {id:"beef",   name:"Beef Cattle", em:"🐄"},
-  {id:"sheep",  name:"Sheep",       em:"🐑"},
-  {id:"swine",  name:"Swine",       em:"🐖"},
-  {id:"dairy",  name:"Dairy",       em:"🥛"},
-  {id:"goat",   name:"Goat",        em:"🐐"},
-  {id:"horse",  name:"Horse",       em:"🐴"},
-  {id:"rabbit", name:"Rabbit",      em:"🐇"},
-  {id:"poultry",name:"Poultry",     em:"🐓"},
+  {id:"beef",   name:"Beef Cattle",     em:"🐄"},
+  {id:"sheep",  name:"Sheep",           em:"🐑"},
+  {id:"swine",  name:"Swine",           em:"🐖"},
+  {id:"dairy",  name:"Dairy",           em:"🥛"},
+  {id:"goat",   name:"Goat",            em:"🐐"},
+  {id:"horse",  name:"Horse",           em:"🐴"},
+  {id:"rabbit", name:"Rabbit",          em:"🐇"},
+  {id:"poultry",name:"Poultry",         em:"🐓"},
+  {id:"llama", name:"Llama and Alpaca", em:"🦙"},
 ];
 const CLUBS = [
   {id:"anthon",   name:"Anthon Advancers",         species:["beef","sheep","swine","goat"]},
-  {id:"arlington",name:"Arlington Future Farmers", species:["beef","swine","dairy"]},
+  {id:"arlington",name:"Arlington Future Farmers", species:["llama","beef","swine","dairy","goat","horse","poultry","rabbit","sheep"]},
   {id:"banner",   name:"Banner Boosters",          species:["sheep","goat","rabbit"]},
   {id:"bgh",      name:"Boys & Girls Home",        species:["rabbit","poultry"]},
   {id:"bronson",  name:"Bronson Rustlers",         species:["beef","sheep","swine","dairy","goat","horse"]},
@@ -407,7 +414,7 @@ const CLUBS = [
   {id:"rockbr",   name:"Rock Branch Producers",    species:["beef","swine"]},
   {id:"rockkee",  name:"Rock-Kee-Union",           species:["sheep","swine","goat"]},
   {id:"sunday",   name:"Sunday Funday",            species:["rabbit","poultry"]},
-  {id:"willow",   name:"Willow Workers",           species:["beef","dairy","goat","horse","poultry"]},
+  {id:"willow",   name:"Willow Workers",           species:["dairy","goat","horse","poultry","llama","rabbit","sheep","swine"]},
   {id:"innov",    name:"Woodbury Innovators",      species:["swine","rabbit"]},
 ];
 
@@ -460,16 +467,31 @@ const BARN_LAYOUT = [
   {clubId:"rockkee", species:"swine", barnId:"swine", pens:3, stalls:"P24–P26", location:"East row"},
 ];
 
-const LS="hsm_woodbury_v2";
+const LS="hsm_woodbury_v3";
 let S = load();
 let activeSpecies = "beef";
 let currentClub = null, currentSpecies = null;
 let draft = {};
 let resultsMode = "overall";
 
+function emptyState(){
+  return {mode:"live", judge:"Pat M.", pass:"d2pm", scores:{}, schedule:{}};
+}
 function load(){
-  try{ const v=JSON.parse(localStorage.getItem(LS)); if(v){ if(!v.schedule) v.schedule={}; return v; } }catch(e){}
-  const s = {judge:"Pat M.", pass:"d2pm", scores:{}, schedule:{}};
+  try{
+    const v=JSON.parse(localStorage.getItem(LS));
+    if(v){
+      if(!v.scores) v.scores={};
+      if(!v.schedule) v.schedule={};
+      if(v.mode!=="sample") v.mode="live";
+      return v;
+    }
+  }catch(e){}
+  return emptyState();
+}
+function createSampleState(){
+  const s = emptyState();
+  s.mode="sample";
   let _r=12345; const rand=()=>{ _r=(_r*9301+49297)%233280; return _r/233280; };
   const rgen = (seed)=>{ let x=seed; return ()=>{ x=(x*9301+49297)%233280; return 3 + (x % 3); }; };
   const notes = [
@@ -487,14 +509,13 @@ function load(){
         if(rand() > fillRatio) return;
         const r = rgen(seedBase + ci*7 + si*3);
         const ratings = {}; RUBRIC.forEach(cat => ratings[cat.key] = r());
-        s.scores[`${c.id}|${sp}|${passId}`] = {r:ratings, note:notes[(ci+si)%notes.length]};
+        s.scores[`${c.id}|${sp}|${passId}`] = {r:ratings, note:notes[(ci+si)%notes.length], judge:"Sample Judge"};
       });
     });
   };
   seedPass("d1am", 1.0, 100);
   seedPass("d1pm", 0.85, 200);
   seedPass("d2am", 0.55, 300);
-  // demo schedule: Day 1 fully assigned, Day 2 partially, Day 3 empty so Jamie can see all states
   const dayAssign = {
     d1am: ["Pat M.","Pat M.","Dana R.","Dana R.","Sam K.","Sam K.","Jamie J.","Jamie J."],
     d1pm: ["Dana R.","Dana R.","Pat M.","Pat M.","Jamie J.","Jamie J.","Sam K.","Sam K."],
@@ -505,91 +526,329 @@ function load(){
   });
   return s;
 }
-function save(){ localStorage.setItem(LS, JSON.stringify(S)); flashSaved(); queueAndPush(); }
+function saveLocal(){ localStorage.setItem(LS, JSON.stringify(S)); flashSaved(); }
+function save(){ saveLocal(); }
 
 // ============ CLOUD SYNC (Google Sheet via Apps Script) ============
-const SYNC_LS = "hsm_sync_v1";
+const SYNC_LS = "hsm_sync_v2";
+const LEGACY_SYNC_LS = "hsm_sync_v1";
+let pushPromise = null;
+
+function defaultSyncState(){
+  return {url:"", lastSync:0, queue:[], recovery:[], datasetId:null, generation:null, lastError:""};
+}
+function canonicalSyncUrl(value){
+  return String(value||'').trim().replace(/[?#].*$/,'').replace(/\/$/,'');
+}
 function syncState(){
-  try { return JSON.parse(localStorage.getItem(SYNC_LS)) || {url:"", lastSync:0, queue:[]}; }
-  catch(e){ return {url:"", lastSync:0, queue:[]}; }
+  try {
+    const current = JSON.parse(localStorage.getItem(SYNC_LS));
+    if(current){
+      const st = {...defaultSyncState(), ...current};
+      if(!Array.isArray(st.queue)) st.queue=[];
+      if(!Array.isArray(st.recovery)) st.recovery=[];
+      const obsolete = st.queue.filter(item=>!item.opId);
+      st.queue = st.queue.filter(item=>item.opId);
+      obsolete.forEach(item=>st.recovery.push({...item, recoveryReason:'client_upgrade_required'}));
+      st.url = canonicalSyncUrl(st.url);
+      if(obsolete.length) saveSyncState(st);
+      return st;
+    }
+    const legacy = JSON.parse(localStorage.getItem(LEGACY_SYNC_LS));
+    const migrated = {...defaultSyncState(), url:canonicalSyncUrl(legacy && legacy.url)};
+    saveSyncState(migrated);
+    return migrated;
+  } catch(e){ return defaultSyncState(); }
 }
-function saveSyncState(s){ localStorage.setItem(SYNC_LS, JSON.stringify(s)); }
+function saveSyncState(st){ localStorage.setItem(SYNC_LS, JSON.stringify(st)); }
+function newOpId(){
+  if(globalThis.crypto && typeof globalThis.crypto.randomUUID==='function'){
+    return globalThis.crypto.randomUUID().replace(/-/g,'');
+  }
+  return `${Date.now().toString(36)}${Math.random().toString(36).slice(2)}${Math.random().toString(36).slice(2)}`;
+}
+function isSampleMode(){ return S.mode==='sample'; }
 function saveSyncUrl(){
-  const u = document.getElementById('syncUrl').value.trim();
-  const st = syncState(); st.url = u; saveSyncState(st);
-  toast(u ? '✓ Sync URL saved' : '↺ Sync URL cleared');
-  renderSyncPanel();
-  if(u) syncNow();
-}
-function queueAndPush(){
-  // snapshot full state, queue it, attempt push
+  const input = document.getElementById('syncUrl');
+  const url = canonicalSyncUrl(input.value);
   const st = syncState();
-  // dedupe: replace any prior snapshot with the latest
-  st.queue = [{ts: Date.now(), kind:'snapshot', payload:{judge:S.judge, pass:S.pass, scores:S.scores, schedule:S.schedule}}];
+  const firstBinding = !st.url && !!url && !st.recovery.length && st.queue.every(item=>!item.backendUrl);
+  if(url!==st.url && (st.queue.length || st.recovery.length) && !firstBinding){
+    input.value=st.url;
+    toast('⚠ Resolve queued/recovery items before changing the Sheet URL');
+    return;
+  }
+  if(url!==st.url){
+    if(firstBinding) st.queue.forEach(item=>{ item.backendUrl=url; });
+    st.url=url; st.datasetId=null; st.generation=null; st.lastSync=0; st.lastError="";
+  }
   saveSyncState(st);
+  toast(url ? '✓ Sync URL saved' : '↺ Sync URL cleared');
   renderSyncPanel();
-  pushQueue();
+  if(url && !isSampleMode()) syncNow();
+}
+function queueScoreUpsert(key, entry){
+  if(isSampleMode()) return;
+  const st = syncState();
+  st.queue = st.queue.filter(item=>!(item.kind==='scoreUpsert' && item.key===key));
+  st.queue.push({
+    opId:newOpId(), ts:Date.now(), kind:'scoreUpsert', key,
+    entry:{...entry, r:{...entry.r}}, expectedRevision:entry.revision || null,
+    backendUrl:st.url, datasetId:st.datasetId, generation:st.generation
+  });
+  saveSyncState(st); renderSyncPanel(); pushQueue();
+}
+function queueScheduleUpsert(key, judge){
+  if(isSampleMode()) return;
+  const st = syncState();
+  st.queue = st.queue.filter(item=>!(item.kind==='scheduleUpsert' && item.key===key));
+  st.queue.push({
+    opId:newOpId(), ts:Date.now(), kind:'scheduleUpsert', key, judge,
+    backendUrl:st.url, datasetId:st.datasetId, generation:st.generation
+  });
+  saveSyncState(st); renderSyncPanel(); pushQueue();
+}
+function recoverItem(st, item, reason){
+  st.queue = st.queue.filter(x=>x.opId!==item.opId);
+  st.recovery.push({...item, recoveryReason:reason, recoveredAt:Date.now()});
+}
+async function postSync(url, body){
+  const response = await fetch(url, {
+    method:'POST', mode:'cors',
+    headers:{'Content-Type':'text/plain;charset=utf-8'},
+    body:JSON.stringify(body)
+  });
+  return response.json();
+}
+async function pullRemoteState(){
+  const st = syncState();
+  if(!st.url) return null;
+  const response = await fetch(st.url + '?action=state', {method:'GET'});
+  const result = await response.json();
+  if(!result || !result.ok || !result.state || !result.state.datasetId){
+    throw new Error('backend_update_required');
+  }
+  applyRemoteState(result.state);
+  return result.state;
+}
+function applyRemoteState(state){
+  const st = syncState();
+  const serverDataset = String(state.datasetId);
+  const serverGeneration = Number(state.generation);
+  const accepted = [];
+  st.queue.slice().forEach(item=>{
+    if(item.backendUrl!==st.url){ recoverItem(st,item,'wrong_backend_url'); return; }
+    const firstContact = item.datasetId==null && item.generation==null && st.datasetId==null;
+    if(firstContact && serverGeneration===1){
+      item.datasetId=serverDataset; item.generation=serverGeneration; accepted.push(item); return;
+    }
+    if(item.datasetId!==serverDataset){ recoverItem(st,item,'wrong_dataset'); return; }
+    if(item.kind==='scoreUpsert' && Number(item.generation)!==serverGeneration){
+      recoverItem(st,item,'stale_generation'); return;
+    }
+    accepted.push(item);
+  });
+
+  S.mode='live';
+  S.scores = {...(state.scores || {})};
+  S.schedule = {...(state.schedule || {})};
+  accepted.forEach(item=>{
+    if(item.kind==='scoreUpsert') S.scores[item.key]=item.entry;
+    if(item.kind==='scheduleUpsert'){
+      if(item.judge) S.schedule[item.key]=item.judge;
+      else delete S.schedule[item.key];
+    }
+  });
+  st.datasetId=serverDataset;
+  st.generation=serverGeneration;
+  st.lastSync=Date.now(); st.lastError="";
+  saveSyncState(st); saveLocal();
+  renderSyncPanel(); renderScore(); syncHeader(); updateModeUi();
+  if(st.recovery.length){
+    toast(`⚠ ${st.recovery.length} local change${st.recovery.length===1?'':'s'} need review`);
+  }
 }
 function pushQueue(){
-  const st = syncState();
-  if(!st.url || !st.queue.length || !navigator.onLine) return;
-  const item = st.queue[0];
-  // Apps Script doPost: use text/plain to avoid CORS preflight
-  fetch(st.url, {
-    method:'POST',
-    mode:'cors',
-    headers:{'Content-Type':'text/plain;charset=utf-8'},
-    body: JSON.stringify({action:'snapshot', ...item.payload})
-  }).then(r=>r.json()).then(res=>{
-    if(res && res.ok){
-      const s2 = syncState(); s2.queue.shift(); s2.lastSync = Date.now(); saveSyncState(s2);
-      renderSyncPanel();
+  const initial = syncState();
+  if(isSampleMode() || !initial.url || !initial.queue.length || !navigator.onLine){
+    return Promise.resolve();
+  }
+  if(pushPromise) return pushPromise;
+  pushPromise = (async()=>{
+    let st = syncState();
+    try {
+      if(!st.datasetId || st.generation===null) await pullRemoteState();
+      while(true){
+        st = syncState();
+        if(!st.queue.length || isSampleMode()) break;
+        const item = st.queue[0];
+        if(item.backendUrl!==st.url || item.datasetId!==st.datasetId){
+          recoverItem(st,item,'wrong_backend'); saveSyncState(st); continue;
+        }
+        const body = item.kind==='scoreUpsert'
+          ? {action:'upsertScore', opId:item.opId, key:item.key, entry:item.entry,
+             expectedRevision:item.expectedRevision, datasetId:item.datasetId, generation:item.generation}
+          : {action:'upsertSchedule', opId:item.opId, key:item.key,
+             judge:item.judge, datasetId:item.datasetId};
+        const result = await postSync(st.url, body);
+        if(result && (result.error==='stale_generation' || result.error==='wrong_dataset')){
+          await pullRemoteState();
+          continue;
+        }
+        if(result && result.error==='client_upgrade_required') throw new Error('backend_update_required');
+        if(!result || !result.ok){
+          const reviewable = result && [
+            'score_conflict','invalid_score_key','unknown_club_species','invalid_judge',
+            'invalid_note','invalid_ratings','invalid_schedule_key'
+          ].includes(result.error);
+          if(reviewable){
+            const latest=syncState(); recoverItem(latest,item,result.error);
+            latest.lastError=result.error; saveSyncState(latest); renderSyncPanel();
+            continue;
+          }
+          throw new Error((result && result.error) || 'sync_failed');
+        }
+        const latest = syncState();
+        latest.queue = latest.queue.filter(x=>x.opId!==item.opId);
+        if(item.kind==='scoreUpsert' && result.revision){
+          const newer = latest.queue.find(x=>x.kind==='scoreUpsert' && x.key===item.key);
+          if(newer){
+            newer.expectedRevision=result.revision;
+            newer.entry.revision=result.revision;
+          }
+          if(S.scores[item.key]) S.scores[item.key].revision=result.revision;
+          saveLocal();
+        }
+        latest.lastSync=Date.now(); latest.lastError=""; saveSyncState(latest);
+        renderSyncPanel();
+      }
+    } catch(err){
+      const failed = syncState();
+      failed.lastError = err && err.message ? err.message : 'sync_failed';
+      saveSyncState(failed); renderSyncPanel();
     }
-  }).catch(()=>{/* leave queued; will retry */});
+  })();
+  pushPromise = pushPromise.finally(()=>{ pushPromise=null; });
+  return pushPromise;
 }
-function syncNow(){
+async function syncNow(){
   const st = syncState();
+  if(isSampleMode()){ toast('🧪 Return to live data before syncing'); return; }
   if(!st.url){ toast('⚠ Add the Apps Script URL first'); return; }
-  // also pull config (clubs/judges/rubric overrides) from sheet
-  fetch(st.url + '?action=config', {method:'GET'}).then(r=>r.json()).then(cfg=>{
-    if(cfg && cfg.ok && cfg.config){ applyRemoteConfig(cfg.config); toast('✓ Pulled config from sheet'); }
-  }).catch(()=>toast('⚠ Could not reach sheet'));
-  queueAndPush();
+  try {
+    const cfgResponse = await fetch(st.url + '?action=config', {method:'GET'});
+    const cfg = await cfgResponse.json();
+    if(cfg && cfg.ok && cfg.config) applyRemoteConfig(cfg.config);
+    else throw new Error('config_failed');
+    await pullRemoteState();
+    await pushQueue();
+    const afterPush = syncState();
+    if(afterPush.lastError && !afterPush.recovery.length) throw new Error(afterPush.lastError);
+    if(!afterPush.queue.length) await pullRemoteState();
+    toast(afterPush.recovery.length
+      ? '⚠ Synced; some local changes need review'
+      : '✓ Config and shared scores synced');
+  } catch(err){
+    const failed = syncState();
+    failed.lastError = err && err.message ? err.message : 'sync_failed';
+    saveSyncState(failed); renderSyncPanel();
+    toast(failed.lastError==='backend_update_required'
+      ? '⚠ Apps Script backend must be updated'
+      : '⚠ Could not complete sync');
+  }
+}
+function restoreSampleData(){
+  if(!confirm('Replace the display on this device with local-only sample data?')) return;
+  const judge=S.judge, pass=S.pass;
+  S = createSampleState(); S.mode='sample'; S.judge=judge; S.pass=pass;
+  saveLocal(); activeSpecies='beef'; updateModeUi(); go('score');
+  toast('🧪 Sample mode — nothing will sync');
+}
+async function exitSampleMode(){
+  S=emptyState(); saveLocal(); updateModeUi(); activeSpecies='beef'; go('score');
+  if(syncState().url) await syncNow();
+  else toast('✓ Returned to empty live data');
 }
 function applyRemoteConfig(cfg){
-  // Soft-merge: only overwrite if sheet provides non-empty arrays
+  const species = Array.isArray(cfg.species) ? cfg.species : [];
+  const speciesIds = species.map(item=>String(item.id||''));
+  if(!species.length || new Set(speciesIds).size!==speciesIds.length ||
+      speciesIds.some(id=>!id.match(/^[a-z0-9_-]{1,50}$/))){
+    throw new Error('invalid_species_config');
+  }
+  const clubs = Array.isArray(cfg.clubs) ? cfg.clubs : [];
+  const known = new Set(speciesIds);
+  if(!clubs.length || clubs.some(club=>
+      !String(club.id||'').match(/^[a-z0-9_-]{1,50}$/) ||
+      (club.species||[]).some(id=>!known.has(id)))){
+    throw new Error('invalid_club_config');
+  }
+
+  SPECIES.length = 0; species.forEach(item=>SPECIES.push(item));
+  CLUBS.length = 0; clubs.forEach(item=>CLUBS.push(item));
   if(Array.isArray(cfg.judges) && cfg.judges.length){
-    JUDGES.length = 0; cfg.judges.forEach(j=>JUDGES.push(j));
+    JUDGES.length = 0; cfg.judges.forEach(item=>JUDGES.push(item));
   }
-  if(Array.isArray(cfg.clubs) && cfg.clubs.length){
-    CLUBS.length = 0; cfg.clubs.forEach(c=>CLUBS.push(c));
+  if(Array.isArray(cfg.barns)){
+    BARNS.length = 0; cfg.barns.forEach(item=>BARNS.push(item));
   }
-  if(Array.isArray(cfg.barns) && cfg.barns.length){
-    BARNS.length = 0; cfg.barns.forEach(b=>BARNS.push(b));
+  if(Array.isArray(cfg.stalls)){
+    STALLS.length = 0; cfg.stalls.forEach(item=>STALLS.push(item));
   }
-  if(Array.isArray(cfg.stalls) && cfg.stalls.length){
-    STALLS.length = 0; cfg.stalls.forEach(s=>STALLS.push(s));
-  }
-  if(Array.isArray(cfg.barnLayout) && cfg.barnLayout.length){
-    BARN_LAYOUT.length = 0; cfg.barnLayout.forEach(row=>BARN_LAYOUT.push(row));
+  if(Array.isArray(cfg.barnLayout)){
+    BARN_LAYOUT.length = 0; cfg.barnLayout.forEach(item=>BARN_LAYOUT.push(item));
   }
   if(Array.isArray(cfg.rubric) && cfg.rubric.length){
-    RUBRIC.length = 0; cfg.rubric.forEach(r=>RUBRIC.push(r));
+    RUBRIC.length = 0; cfg.rubric.forEach(item=>RUBRIC.push(item));
   }
-  // re-render whatever's visible
+  if(!known.has(activeSpecies) || !clubsForSpecies(activeSpecies).length){
+    const first = SPECIES.find(item=>clubsForSpecies(item.id).length);
+    activeSpecies = first ? first.id : SPECIES[0].id;
+  }
   renderScore(); syncHeader();
+}
+function showRecovery(){
+  const items=syncState().recovery;
+  if(!items.length){ toast('✓ No local changes need review'); return; }
+  const summary=items.slice(0,8).map(item=>
+    `${item.key || item.kind}: ${item.recoveryReason || 'not synced'}`).join('\n');
+  const extra=items.length>8 ? `\n…plus ${items.length-8} more` : '';
+  if(confirm(`These local changes were not sent:\n\n${summary}${extra}\n\nCopy recovery details?`)){
+    const details=JSON.stringify(items,null,2);
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(details).then(()=>toast('✓ Recovery details copied'))
+        .catch(()=>prompt('Copy recovery details',details));
+    } else prompt('Copy recovery details',details);
+  }
+}
+function clearRecovery(){
+  const st=syncState();
+  if(!st.recovery.length){ toast('✓ No local changes need review'); return; }
+  if(!confirm('Discard the preserved local changes in Needs review? Copy details first if you may need them.')) return;
+  st.recovery=[]; st.lastError=""; saveSyncState(st); renderSyncPanel();
+  toast('✓ Reviewed local changes discarded');
+}
+function updateModeUi(){
+  const banner=document.getElementById('sampleBanner');
+  if(banner) banner.style.display=isSampleMode()?'flex':'none';
+  const label=document.getElementById('sampleActionLabel');
+  if(label) label.textContent=isSampleMode()?'Return to live data':'Restore sample data on this device';
 }
 function renderSyncPanel(){
   const st = syncState();
   const u = document.getElementById('syncUrl'); if(u) u.value = st.url || '';
   const b = document.getElementById('syncBadge');
-  if(b) b.textContent = !st.url ? 'Not configured' : (st.queue.length ? '⏳ Pending' : '✓ Synced');
+  if(b) b.textContent = isSampleMode() ? '🧪 Sample mode' :
+    (!st.url ? 'Not configured' : (st.lastError ? '⚠ Sync issue' : (st.queue.length ? '⏳ Pending' : '✓ Synced')));
   const ls = document.getElementById('lastSyncTxt');
   if(ls) ls.textContent = st.lastSync ? new Date(st.lastSync).toLocaleString() : 'Never';
   const q = document.getElementById('queuedTxt'); if(q) q.textContent = st.queue.length;
+  const recovery = document.getElementById('recoveryTxt'); if(recovery) recovery.textContent = st.recovery.length;
+  const clearRow = document.getElementById('recoveryClearRow'); if(clearRow) clearRow.style.display = st.recovery.length ? 'flex' : 'none';
+  updateModeUi();
 }
-window.addEventListener('online', ()=>{ pushQueue(); });
-setInterval(pushQueue, 30000); // retry every 30s
+window.addEventListener('online', ()=>{ if(!isSampleMode()) syncNow(); });
+setInterval(()=>{ if(!isSampleMode() && syncState().queue.length) pushQueue(); }, 30000);
 
 function calc(r){
   if(!r) return 0;
@@ -770,8 +1029,15 @@ function updateLive(){ document.getElementById('liveScore').textContent = calc(d
 function saveSheet(){
   const complete = RUBRIC.every(c=>draft[c.key]);
   if(!complete){ toast('⚠ Score every category first'); return; }
-  S.scores[`${currentClub}|${currentSpecies}|${S.pass}`] = {r:{...draft}, note:document.getElementById('noteBox').value.trim()};
-  save();
+  const key = `${currentClub}|${currentSpecies}|${S.pass}`;
+  const entry = {
+    r:{...draft},
+    note:document.getElementById('noteBox').value.trim(),
+    judge:S.judge,
+    revision:S.scores[key]?.revision || null
+  };
+  S.scores[key] = entry;
+  saveLocal(); queueScoreUpsert(key, entry);
   const c = CLUBS.find(x=>x.id===currentClub);
   toast(`✓ ${c.name} — ${calc(draft)}/100 saved`);
   setTimeout(()=>go('score'),350);
@@ -977,28 +1243,32 @@ function cycleJudge(passId, sp){
   const idx = cycle.indexOf(cur);
   const next = cycle[(idx+1) % cycle.length];
   if(next) S.schedule[key] = next; else delete S.schedule[key];
-  save(); renderSchedule();
+  saveLocal(); queueScheduleUpsert(key, next); renderSchedule();
 }
 function schedAutofill(){
   // round-robin fill of empty slots, balancing workload
   const counts = {}; JUDGES.forEach(j=>counts[j]=0);
   Object.values(S.schedule||{}).forEach(j=>{ if(j && counts[j]!==undefined) counts[j]++; });
-  let filled = 0;
+  const changed = [];
   PASSES.forEach(p=>{
     SPECIES.forEach(sp=>{
       const key = `${p.id}|${sp.id}`;
       if(S.schedule[key]) return;
-      // pick least-loaded judge
       const j = JUDGES.slice().sort((a,b)=>counts[a]-counts[b])[0];
-      S.schedule[key] = j; counts[j]++; filled++;
+      S.schedule[key] = j; counts[j]++; changed.push([key,j]);
     });
   });
-  save(); renderSchedule();
-  toast(`⚡ Filled ${filled} slot${filled===1?'':'s'}`);
+  saveLocal();
+  changed.forEach(([key,judge])=>queueScheduleUpsert(key,judge));
+  renderSchedule();
+  toast(`⚡ Filled ${changed.length} slot${changed.length===1?'':'s'}`);
 }
 function schedClear(){
   if(!confirm('Clear all schedule assignments?')) return;
-  S.schedule = {}; save(); renderSchedule();
+  const keys = PASSES.flatMap(p=>SPECIES.map(sp=>`${p.id}|${sp.id}`));
+  S.schedule = {}; saveLocal();
+  keys.forEach(key=>queueScheduleUpsert(key,''));
+  renderSchedule();
   toast('↺ Schedule cleared');
 }
 
@@ -1037,7 +1307,6 @@ function flashSaved(){
   x.textContent='Saving…'; d.classList.add('off');
   setTimeout(()=>{x.textContent='Saved'; d.classList.remove('off');},500);
 }
-function resetDemo(){ localStorage.removeItem(LS); S = load(); save(); syncHeader(); activeSpecies='beef'; go('score'); toast('↺ Demo reset'); }
 let tapN=0;
 function bumpOffline(){
   tapN++; if(tapN>=3){
@@ -1048,9 +1317,10 @@ function bumpOffline(){
 }
 
 syncHeader();
+updateModeUi();
 renderScore();
-// On launch: if a sync URL is configured, try to pull latest config and push queued
-if(syncState().url){ setTimeout(syncNow, 400); }
+// Sample mode remains local until the user explicitly returns to live data.
+if(syncState().url && !isSampleMode()){ setTimeout(syncNow, 400); }
 </script>
 </body>
 </html>

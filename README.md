@@ -1,7 +1,9 @@
-# Herdsmanship Judging — Prototype
+# Herdsmanship Judge PWA
 
-Clickable mobile prototype of a Herdsmanship scoring tool for the Woodbury County 4-H/FFA Fair.
+Mobile-first Herdsmanship scoring tool for the Woodbury County 4-H/FFA Fair.
 
 **Open on phone:** https://kingofrandom.github.io/herdsmanship-demo/
 
-Rubric and rules sourced from the Woodbury County Fair book (Supt. Jamie Johnson). This is a working mockup, not a finished tool — camera, voice-to-text, and export are demo placeholders; everything else (scoring, saving, results, feedback sheet) works for real.
+The app supports offline scoring, Google Sheet-managed clubs/species/barns/stalls/layouts, revisioned per-record score synchronization, per-slot schedule updates, rankings, printable feedback, and a visibly isolated local sample mode. Shared score resets are owner-only Sheet actions; protected dataset/generation metadata prevents stale or misconfigured devices from silently restoring or overwriting data.
+
+See [`SETUP.md`](SETUP.md) for Google Apps Script deployment and judge-phone setup.
