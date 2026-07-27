@@ -27,6 +27,7 @@ const TABS = {
 const META = {
   DATASET_ID: 'HSM_DATASET_ID',
   SCORE_GENERATION: 'HSM_SCORE_GENERATION',
+  INITIAL_BOUNDARY: 'HSM_INITIAL_BOUNDARY',
   RESET_PENDING_ID: 'HSM_RESET_PENDING_ID',
   LAST_RESET_ID: 'HSM_LAST_RESET_ID',
 };
@@ -460,7 +461,8 @@ function resetAllScores_() {
     const resetId = Utilities.getUuid();
     PropertiesService.getScriptProperties().setProperties({
       [META.RESET_PENDING_ID]:resetId,
-      [META.SCORE_GENERATION]:String(meta.generation + 1)
+      [META.SCORE_GENERATION]:String(meta.generation + 1),
+      [META.INITIAL_BOUNDARY]:'owner-reset'
     });
     const cleared = completePendingReset_();
     const next = syncMetadata_();
@@ -487,14 +489,35 @@ function completePendingReset_() {
 function syncMetadata_() {
   const props = PropertiesService.getScriptProperties();
   let datasetId = props.getProperty(META.DATASET_ID);
+  const hadDataset = !!datasetId;
+  let initialBoundary = props.getProperty(META.INITIAL_BOUNDARY);
   let generation = Number(props.getProperty(META.SCORE_GENERATION));
   if (!datasetId) {
     datasetId = Utilities.getUuid();
-    props.setProperty(META.DATASET_ID, datasetId);
+    initialBoundary = 'fresh-dataset';
+    props.setProperties({
+      [META.DATASET_ID]:datasetId,
+      [META.INITIAL_BOUNDARY]:initialBoundary
+    });
   }
   if (!Number.isInteger(generation) || generation < 1) {
     generation = 1;
     props.setProperty(META.SCORE_GENERATION, '1');
+  }
+
+  // One-time upgrade for a dataset that existed before protected reset epochs.
+  // It advances only when the score sheet is already empty, so it never clears
+  // live work. Fresh datasets keep generation 1 for their first safe binding.
+  if (hadDataset && !initialBoundary && generation === 1) {
+    const scoreSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(TABS.SCORES);
+    if (scoreSheet && scoreSheet.getLastRow() <= 1) {
+      generation = 2;
+      initialBoundary = 'existing-empty-v1';
+      props.setProperties({
+        [META.SCORE_GENERATION]:'2',
+        [META.INITIAL_BOUNDARY]:initialBoundary
+      });
+    }
   }
   return {datasetId, generation,
     lastResetId:props.getProperty(META.LAST_RESET_ID) || ''};

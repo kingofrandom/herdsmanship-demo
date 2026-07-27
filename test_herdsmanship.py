@@ -115,6 +115,16 @@ class HerdsmanshipFeatureTests(unittest.TestCase):
         self.assertNotIn("action === 'resetScores'", CODE_GS)
         self.assertIn("client_upgrade_required", CODE_GS)
 
+    def test_existing_empty_dataset_advances_one_generation_boundary(self):
+        for text in [
+            "HSM_INITIAL_BOUNDARY",
+            "const hadDataset = !!datasetId",
+            "hadDataset && !initialBoundary && generation === 1",
+            "scoreSheet.getLastRow() <= 1",
+            "[META.SCORE_GENERATION]:'2'",
+        ]:
+            self.assertIn(text, CODE_GS)
+
     def test_backend_validates_idempotent_revisioned_writes(self):
         for text in [
             "function upsertScore_",
