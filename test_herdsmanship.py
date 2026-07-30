@@ -100,6 +100,23 @@ class HerdsmanshipFeatureTests(unittest.TestCase):
         self.assertIn("if(isSampleMode()) return;", INDEX)
         self.assertNotIn("function clearAllScores", INDEX)
 
+    def test_setup_can_be_protected_by_a_local_hashed_pin(self):
+        for text in [
+            'const SETUP_LOCK_LS = "hsm_setup_lock_v1"',
+            "function isSetupLockEnabled",
+            "async function saveSetupPin",
+            "async function verifySetupPin",
+            "function openSetupLockModal",
+            "async function submitSetupLock",
+            'id="setupLockModal"',
+            'id="setupLockAction"',
+            "4–8 digit PIN",
+        ]:
+            self.assertIn(text, INDEX)
+        self.assertIn("if(v==='setup' && isSetupLockEnabled() && !setupUnlocked)", INDEX)
+        self.assertIn("crypto.subtle.digest('SHA-256'", INDEX)
+        self.assertNotIn("setupPin:\"", INDEX)
+
     def test_backend_uses_protected_metadata_and_owner_only_reset(self):
         for text in [
             "function resetAllScores",

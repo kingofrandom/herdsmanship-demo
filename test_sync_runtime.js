@@ -4,6 +4,7 @@
 const assert = require('assert');
 const fs = require('fs');
 const vm = require('vm');
+const {webcrypto} = require('crypto');
 
 async function testFrontendRuntime() {
   const html = fs.readFileSync('index.html', 'utf8');
@@ -32,7 +33,12 @@ async function testFrontendRuntime() {
     navigator:{onLine:false},
     window:{addEventListener:()=>{},scrollTo:()=>{}},
     document:{getElementById:element},
-    crypto:{randomUUID:(()=>{let n=0;return()=>`00000000-0000-4000-8000-${String(++n).padStart(12,'0')}`;})()},
+    crypto:{
+      subtle:webcrypto.subtle,
+      getRandomValues:array=>webcrypto.getRandomValues(array),
+      randomUUID:(()=>{let n=0;return()=>`00000000-0000-4000-8000-${String(++n).padStart(12,'0')}`;})(),
+    },
+    TextEncoder,
     fetch:async()=>{throw new Error('unexpected network request');},
     confirm:()=>true,
     flashSaved:()=>{}, renderSyncPanel:()=>{}, renderScore:()=>{}, syncHeader:()=>{},
@@ -66,6 +72,8 @@ async function testFrontendRuntime() {
     `navigator.onLine=true; const pushing=pushQueue(); await Promise.resolve(); await Promise.resolve(); const second=score(5); S.scores['club|beef|d1am']=second; queueScoreUpsert('club|beef|d1am',second); resolveFirst(); await pushing;\n` +
     `assert.strictEqual(posts.length,2,'newer edit was deleted by older acknowledgement'); assert.strictEqual(posts[1].expectedRevision,'rev1'); assert.strictEqual(syncState().queue.length,0); assert.strictEqual(S.scores['club|beef|d1am'].revision,'rev2');\n` +
     `S=createSampleState(); const sampleCount=Object.keys(S.scores).length; assert(sampleCount>0); const queued=syncState().queue.length; queueScoreUpsert('club|beef|d1am',score(1)); assert.strictEqual(syncState().queue.length,queued);\n` +
+    `assert.strictEqual(isSetupLockEnabled(),false); await saveSetupPin('2468'); assert.strictEqual(isSetupLockEnabled(),true);\n` +
+    `const storedLock=localStorage.getItem(SETUP_LOCK_LS); assert(!storedLock.includes('2468'),'readable PIN was stored'); assert(await verifySetupPin('2468')); assert(!(await verifySetupPin('1357')));\n` +
     `return 'ok';\n})()`;
   const result = await vm.runInNewContext(testCode, context, {filename:'frontend-runtime.vm.js'});
   assert.strictEqual(result, 'ok');

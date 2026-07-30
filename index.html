@@ -191,8 +191,25 @@
   .offline-banner{background:var(--warn-bg); color:var(--warn); font-size:12px; font-weight:600; text-align:center; padding:5px; border-bottom:1px solid #f0deb8;}
   .sample-banner{background:#e9f0ff;color:#244b8f;border-bottom-color:#c8d8f4;display:flex;align-items:center;justify-content:center;gap:9px;padding:7px 10px;}
   .sample-banner button{border:1px solid #8da9d8;background:#fff;color:#244b8f;border-radius:999px;padding:4px 9px;font-weight:700;font-size:11px;}
+  .lock-status{font-size:12px;color:var(--muted);margin-top:3px;line-height:1.35;}
+  .lock-actions{display:flex;align-items:center;justify-content:flex-end;gap:7px;flex-wrap:wrap;}
+  .lock-action{border:1px solid var(--line);background:#fff;color:var(--green-d);border-radius:9px;padding:8px 11px;font-weight:750;font-size:12.5px;cursor:pointer;}
+  .lock-action.danger{color:var(--danger);}
+  .modal-backdrop{position:fixed;inset:0;background:rgba(10,22,15,.58);z-index:80;display:none;align-items:center;justify-content:center;padding:20px;}
+  .modal-backdrop.open{display:flex;}
+  .lock-modal{width:min(100%,390px);background:#fff;border-radius:18px;padding:20px;box-shadow:0 18px 60px rgba(0,0,0,.32);}
+  .lock-modal-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:8px;}
+  .lock-modal h2{font-size:20px;line-height:1.2;margin:0;color:var(--ink);}
+  .lock-modal-copy{font-size:13.5px;color:var(--muted);line-height:1.45;margin:0 0 16px;}
+  .modal-close{border:none;background:var(--bg);color:var(--muted);width:34px;height:34px;border-radius:50%;font-size:21px;line-height:1;cursor:pointer;flex-shrink:0;}
+  .pin-label{display:block;font-size:13px;font-weight:750;margin-bottom:6px;}
+  .pin-input{width:100%;height:52px;border:1.5px solid var(--line);border-radius:11px;padding:0 13px;font:inherit;font-size:20px;letter-spacing:5px;background:#fff;margin-bottom:12px;}
+  .pin-input:focus{outline:3px solid rgba(0,107,52,.14);border-color:var(--green);}
+  .pin-error{min-height:20px;color:var(--danger);font-size:12.5px;font-weight:650;margin:-3px 0 10px;}
+  .modal-actions{display:flex;gap:9px;}
+  .modal-actions .btn{height:50px;font-size:15px;}
   @media print {
-    nav, header, .save-bar, .photo-row, .note-wrap, .toast { display:none !important; }
+    nav, header, .save-bar, .photo-row, .note-wrap, .toast, .modal-backdrop { display:none !important; }
     .phone { box-shadow:none; max-width:100%; }
     main { padding-bottom:0 !important; }
     .fb-sheet { page-break-inside:avoid; }
@@ -305,6 +322,18 @@
         <div class="row"><span class="lab">Inspection</span>
           <div class="seg" id="passSeg"></div></div>
       </div>
+      <h2 class="sec"><span>Setup protection</span><span class="right" id="setupLockBadge">Off</span></h2>
+      <div class="panel">
+        <div class="row">
+          <div><div class="lab">Protect Setup on this device</div><div class="lock-status" id="setupLockStatus">Anyone can open and change Setup.</div></div>
+          <div class="lock-actions">
+            <button class="lock-action" id="setupLockAction" onclick="beginSetupLockChange()">Set PIN</button>
+            <button class="lock-action danger" id="setupLockDisable" style="display:none" onclick="beginDisableSetupLock()">Turn off</button>
+          </div>
+        </div>
+      </div>
+      <div class="hint">Optional 4–8 digit PIN. The lock applies only to this browser/device and prevents accidental Setup changes. It does not replace the owner-only controls in Google Sheets.</div>
+
       <h2 class="sec"><span>Rubric · 100 pts</span><span class="right">Woodbury 2026</span></h2>
       <div class="panel" id="rubricPanel"></div>
       <div class="hint">Source: Woodbury County Fair book, p.45. Inspected twice daily; daily scoring on all species combined for daily total. Final placings = sum across all inspection days.</div>
@@ -356,6 +385,28 @@
     <button id="nav-schedule" onclick="go('schedule')"><span class="ic">📅</span>Schedule</button>
     <button id="nav-setup" onclick="go('setup')"><span class="ic">⚙️</span>Setup</button>
   </nav>
+  <div class="modal-backdrop" id="setupLockModal" aria-hidden="true">
+    <div class="lock-modal" role="dialog" aria-modal="true" aria-labelledby="setupLockTitle">
+      <div class="lock-modal-head">
+        <h2 id="setupLockTitle">Setup is locked</h2>
+        <button class="modal-close" type="button" onclick="closeSetupLockModal()" aria-label="Close">×</button>
+      </div>
+      <p class="lock-modal-copy" id="setupLockCopy">Enter the PIN to change this device's Setup.</p>
+      <form onsubmit="submitSetupLock(event)">
+        <label class="pin-label" for="setupPin">PIN</label>
+        <input class="pin-input" id="setupPin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8" autocomplete="off" aria-describedby="setupPinError">
+        <div id="setupPinConfirmWrap" style="display:none">
+          <label class="pin-label" for="setupPinConfirm">Confirm PIN</label>
+          <input class="pin-input" id="setupPinConfirm" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8" autocomplete="off">
+        </div>
+        <div class="pin-error" id="setupPinError" aria-live="polite"></div>
+        <div class="modal-actions">
+          <button class="btn ghost" type="button" onclick="closeSetupLockModal()">Cancel</button>
+          <button class="btn primary" id="setupLockSubmit" type="submit">Unlock</button>
+        </div>
+      </form>
+    </div>
+  </div>
   <div class="toast" id="toast"></div>
 </div>
 
@@ -468,11 +519,14 @@ const BARN_LAYOUT = [
 ];
 
 const LS="hsm_woodbury_v3";
+const SETUP_LOCK_LS = "hsm_setup_lock_v1";
 let S = load();
 let activeSpecies = "beef";
 let currentClub = null, currentSpecies = null;
 let draft = {};
 let resultsMode = "overall";
+let setupUnlocked = false;
+let setupLockMode = "unlock";
 
 function emptyState(){
   return {mode:"live", judge:"Pat M.", pass:"d2pm", scores:{}, schedule:{}};
@@ -528,6 +582,106 @@ function createSampleState(){
 }
 function saveLocal(){ localStorage.setItem(LS, JSON.stringify(S)); flashSaved(); }
 function save(){ saveLocal(); }
+
+// ============ OPTIONAL PER-DEVICE SETUP LOCK ============
+function setupLockState(){
+  try {
+    const state=JSON.parse(localStorage.getItem(SETUP_LOCK_LS));
+    return state && state.salt && state.hash ? state : null;
+  } catch(e){ return null; }
+}
+function isSetupLockEnabled(){ return !!setupLockState(); }
+function setupPinValid(pin){ return /^\d{4,8}$/.test(String(pin||'')); }
+function bytesToHex(bytes){ return Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join(''); }
+async function hashSetupPin(pin, salt){
+  const input=new TextEncoder().encode(`${salt}:${pin}`);
+  const digest=await crypto.subtle.digest('SHA-256', input);
+  return bytesToHex(new Uint8Array(digest));
+}
+async function saveSetupPin(pin){
+  if(!setupPinValid(pin)) throw new Error('invalid_pin');
+  const saltBytes=new Uint8Array(16); crypto.getRandomValues(saltBytes);
+  const salt=bytesToHex(saltBytes);
+  const hash=await hashSetupPin(pin,salt);
+  localStorage.setItem(SETUP_LOCK_LS,JSON.stringify({version:1,salt,hash}));
+}
+async function verifySetupPin(pin){
+  const state=setupLockState();
+  if(!state || !setupPinValid(pin)) return false;
+  const actual=await hashSetupPin(pin,state.salt);
+  if(actual.length!==state.hash.length) return false;
+  let different=0;
+  for(let i=0;i<actual.length;i++) different|=actual.charCodeAt(i)^state.hash.charCodeAt(i);
+  return different===0;
+}
+function setSetupLockError(message){
+  const el=document.getElementById('setupPinError'); if(el) el.textContent=message||'';
+}
+function openSetupLockModal(mode='unlock'){
+  setupLockMode=mode;
+  const modal=document.getElementById('setupLockModal');
+  const title=document.getElementById('setupLockTitle');
+  const copy=document.getElementById('setupLockCopy');
+  const submit=document.getElementById('setupLockSubmit');
+  const confirmWrap=document.getElementById('setupPinConfirmWrap');
+  const pin=document.getElementById('setupPin');
+  const pinConfirm=document.getElementById('setupPinConfirm');
+  const config={
+    unlock:['Setup is locked',"Enter the PIN to change this device's Setup.",'Unlock'],
+    create:['Create Setup PIN','Choose a 4–8 digit PIN for this browser/device.','Protect Setup'],
+    change:['Change Setup PIN','Enter the current PIN first.','Continue'],
+    disable:['Turn off Setup lock','Enter the current PIN to remove protection.','Turn off lock'],
+  }[mode] || null;
+  if(!modal || !config) return;
+  title.textContent=config[0]; copy.textContent=config[1]; submit.textContent=config[2];
+  confirmWrap.style.display=mode==='create'?'block':'none';
+  pin.value=''; pinConfirm.value=''; setSetupLockError('');
+  modal.classList.add('open'); modal.setAttribute('aria-hidden','false');
+  setTimeout(()=>pin.focus(),50);
+}
+function closeSetupLockModal(){
+  const modal=document.getElementById('setupLockModal');
+  if(!modal) return;
+  modal.classList.remove('open'); modal.setAttribute('aria-hidden','true');
+  setSetupLockError('');
+}
+function beginSetupLockChange(){ openSetupLockModal(isSetupLockEnabled()?'change':'create'); }
+function beginDisableSetupLock(){ openSetupLockModal('disable'); }
+async function submitSetupLock(event){
+  event.preventDefault();
+  const pin=document.getElementById('setupPin').value.trim();
+  const confirmPin=document.getElementById('setupPinConfirm').value.trim();
+  setSetupLockError('');
+  try {
+    if(setupLockMode==='create'){
+      if(!setupPinValid(pin)){ setSetupLockError('Use a 4–8 digit PIN.'); return; }
+      if(pin!==confirmPin){ setSetupLockError('The PINs do not match.'); return; }
+      await saveSetupPin(pin); setupUnlocked=true; closeSetupLockModal();
+      renderSetupLockControls(); toast('🔒 Setup PIN enabled on this device'); return;
+    }
+    if(!(await verifySetupPin(pin))){ setSetupLockError('Incorrect PIN.'); return; }
+    if(setupLockMode==='unlock'){
+      setupUnlocked=true; closeSetupLockModal(); go('setup'); return;
+    }
+    if(setupLockMode==='change'){ openSetupLockModal('create'); return; }
+    if(setupLockMode==='disable'){
+      localStorage.removeItem(SETUP_LOCK_LS); setupUnlocked=true; closeSetupLockModal();
+      renderSetupLockControls(); toast('🔓 Setup lock turned off');
+    }
+  } catch(e){ setSetupLockError('Could not update the Setup PIN on this device.'); }
+}
+function renderSetupLockControls(){
+  const enabled=isSetupLockEnabled();
+  const badge=document.getElementById('setupLockBadge'); if(badge) badge.textContent=enabled?'🔒 On':'Off';
+  const status=document.getElementById('setupLockStatus');
+  if(status) status.textContent=enabled?'PIN required whenever Setup is opened.':'Anyone can open and change Setup.';
+  const action=document.getElementById('setupLockAction'); if(action) action.textContent=enabled?'Change PIN':'Set PIN';
+  const disable=document.getElementById('setupLockDisable'); if(disable) disable.style.display=enabled?'inline-block':'none';
+}
+if(document.addEventListener){
+  document.addEventListener('visibilitychange',()=>{ if(document.hidden) setupUnlocked=false; });
+  document.addEventListener('keydown',event=>{ if(event.key==='Escape') closeSetupLockModal(); });
+}
 
 // ============ CLOUD SYNC (Google Sheet via Apps Script) ============
 const SYNC_LS = "hsm_sync_v2";
@@ -881,6 +1035,11 @@ function clubPassTotal(clubId, passId){
 function passLabel(id){ return PASSES.find(p=>p.id===id)?.label || id; }
 
 function go(v){
+  if(v==='setup' && isSetupLockEnabled() && !setupUnlocked){
+    openSetupLockModal('unlock');
+    return;
+  }
+  if(v!=='setup' && isSetupLockEnabled()) setupUnlocked=false;
   document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
   document.getElementById('view-'+v).classList.add('active');
   ['score','results','schedule','setup'].forEach(n=>{
@@ -1291,6 +1450,7 @@ function renderSetup(){
     d.innerHTML = `<span class="rn">${c.name}</span><span class="rw">${c.wt} pts</span>`;
     rp.appendChild(d);
   });
+  renderSetupLockControls();
   renderSyncPanel();
 }
 

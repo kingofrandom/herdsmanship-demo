@@ -69,6 +69,20 @@ in **your** Google Drive.
    to **✓ Synced** and Last sync should show the current time.
 6. Repeat step 1–5 on every judge's phone. They all paste the same URL.
 
+### Optional — protect Setup with a PIN
+
+After Cloud Sync shows **✓ Synced**, each phone can protect its Setup screen:
+
+1. In **Setup**, find **Setup protection**.
+2. Tap **Set PIN** and enter the same 4–8 digit PIN twice.
+3. Leave Setup. The app will require the PIN the next time anyone taps Setup,
+   the judge chip, or the inspection chip. It also re-locks when the app is hidden.
+
+The PIN applies only to that browser/device and is not synced through Google Sheets,
+so repeat these steps on every judge phone you want protected. The app stores a salted
+hash rather than the readable PIN. This is an accidental-change guard, not a replacement
+for the owner-only score reset and Sheet permissions.
+
 ## Step 5 — Hand off to Jamie
 
 What Jamie controls from the sheet:
@@ -181,6 +195,10 @@ Example Barn Layout rows:
 - **“⚠ Sync issue” after updating the PWA** → deploy the latest `Code.gs` as a new
   Apps Script version. The updated client intentionally refuses the old whole-sheet
   snapshot protocol.
+- **Forgot the Setup PIN** → there is intentionally no readable or cloud-recoverable PIN.
+  First confirm that the phone shows no queued unsynced work. Clearing this site's browser
+  data removes the lock, but it also removes local-only state and the saved sync URL; reopen
+  the app, paste the Web App URL again, sync, and set a new PIN.
 
 ## Re-deploying after editing Code.gs
 
