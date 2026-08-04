@@ -11,6 +11,7 @@ import unittest
 ROOT = Path(__file__).resolve().parent
 INDEX = (ROOT / "index.html").read_text()
 CODE_GS = (ROOT / "Code.gs").read_text()
+ADMIN_DIALOG = (ROOT / "AdminDialog.html").read_text() if (ROOT / "AdminDialog.html").exists() else ""
 
 
 class HerdsmanshipFeatureTests(unittest.TestCase):
@@ -79,7 +80,8 @@ class HerdsmanshipFeatureTests(unittest.TestCase):
 
     def test_species_sheet_completes_read_response_apply_path(self):
         self.assertIn("const species = rows(TABS.SPECIES)", CODE_GS)
-        self.assertIn("return { clubs, barns, stalls, barnLayout, judges, rubric, species, settings }", CODE_GS)
+        self.assertIn("return { clubs, barns, stalls, barnLayout, judges, rubric, species, settings,", CODE_GS)
+        self.assertIn("setupProtection:readSetupProtection_()", CODE_GS)
         self.assertIn("Array.isArray(cfg.species)", INDEX)
         self.assertIn("SPECIES.length = 0", INDEX)
         self.assertIn('{id:"llama", name:"Llama and Alpaca", em:"🦙"}', INDEX)
@@ -100,22 +102,28 @@ class HerdsmanshipFeatureTests(unittest.TestCase):
         self.assertIn("if(isSampleMode()) return;", INDEX)
         self.assertNotIn("function clearAllScores", INDEX)
 
-    def test_setup_can_be_protected_by_a_local_hashed_pin(self):
+    def test_setup_lock_is_global_and_sheet_owner_managed(self):
         for text in [
-            'const SETUP_LOCK_LS = "hsm_setup_lock_v1"',
-            "function isSetupLockEnabled",
-            "async function saveSetupPin",
-            "async function verifySetupPin",
-            "function openSetupLockModal",
-            "async function submitSetupLock",
+            "SETUP_LOCK_HASH", "SETUP_LOCK_SALT", "SETUP_LOCK_REVISION",
+            "function setSetupPasswordFromDialog", "function disableSetupLock",
+            "function verifySetupAccess_", "function assertSheetOwner_",
+            "Session.getEffectiveUser", "Set/change global Setup password…", "Turn off global Setup lock…",
+            "action === 'verifySetupAccess'", "setupProtection:readSetupProtection_()",
+        ]:
+            self.assertIn(text, CODE_GS)
+        for text in [
+            'const SETUP_PROTECTION_LS = "hsm_setup_protection_v1"',
+            "function applySetupProtection", "async function verifySetupAccess",
+            "action:'verifySetupAccess'", "cfg.setupProtection",
+            "Managed by the Google Sheet owner for every synced device",
             'id="setupLockModal"',
-            'id="setupLockAction"',
-            "4–8 digit PIN",
         ]:
             self.assertIn(text, INDEX)
-        self.assertIn("if(v==='setup' && isSetupLockEnabled() && !setupUnlocked)", INDEX)
-        self.assertIn("crypto.subtle.digest('SHA-256'", INDEX)
-        self.assertNotIn("setupPin:\"", INDEX)
+        self.assertIn('type="password"', ADMIN_DIALOG)
+        self.assertIn("google.script.run", ADMIN_DIALOG)
+        self.assertNotIn("function saveSetupPin", INDEX)
+        self.assertNotIn("crypto.subtle.digest('SHA-256'", INDEX)
+        self.assertNotIn('id="setupLockAction"', INDEX)
 
     def test_backend_uses_protected_metadata_and_owner_only_reset(self):
         for text in [
@@ -131,6 +139,8 @@ class HerdsmanshipFeatureTests(unittest.TestCase):
             self.assertIn(text, CODE_GS)
         self.assertNotIn("action === 'resetScores'", CODE_GS)
         self.assertIn("client_upgrade_required", CODE_GS)
+        reset_ui = CODE_GS[CODE_GS.index("function resetAllScores()") : CODE_GS.index("// ---------- Sheet bootstrap")]
+        self.assertIn("assertSheetOwner_();", reset_ui)
 
     def test_existing_empty_dataset_advances_one_generation_boundary(self):
         for text in [
@@ -173,6 +183,20 @@ class HerdsmanshipFeatureTests(unittest.TestCase):
         self.assertNotIn("latest.queue.shift()", INDEX)
         self.assertNotIn("action:'updateSchedule'", INDEX)
         self.assertNotIn("payload:{judge:S.judge, pass:S.pass, scores:S.scores", INDEX)
+
+    def test_production_sync_is_automatic_on_every_device(self):
+        production_url = (
+            "https://script.google.com/macros/s/"
+            "AKfycbyfBeDlcDCXcU10eZYv4AcaC8pBzDIHd18_biw267idcPJl_ORQxX4d56rNnAwEU5j7/exec"
+        )
+        self.assertIn(f'const PRODUCTION_SYNC_URL = "{production_url}"', INDEX)
+        self.assertIn('return {url:PRODUCTION_SYNC_URL, lastSync:0', INDEX)
+        self.assertIn("bindProductionSync", INDEX)
+        self.assertIn("syncPromise", INDEX)
+        self.assertIn("requestJson", INDEX)
+        self.assertIn("document.hidden", INDEX)
+        self.assertNotIn('onclick="saveSyncUrl()"', INDEX)
+        self.assertIn('id="syncUrl" type="url" readonly', INDEX)
 
     def test_runtime_sync_contract(self):
         result = subprocess.run(

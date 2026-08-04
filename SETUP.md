@@ -8,8 +8,8 @@ in **your** Google Drive.
 
 - A Google Sheet in your Drive named "Herdsmanship 2026 (Woodbury)"
   with tabs: Clubs, Barns, Stalls, Barn Layout, Judges, Rubric, Species, Settings, Scores, Schedule.
-- A web app URL (long, ugly string) — paste it into the PWA's Setup
-  screen on each judge's phone.
+- A web app URL used by the production PWA. The deployed endpoint is embedded in
+  the app, so judge phones connect automatically.
 - Edits to Clubs / Barns / Stalls / Barn Layout / Judges / Rubric / Species you make in the sheet show up in
   the PWA the next time a judge opens it.
 - Scores entered in the PWA are upserted one record at a time into the Scores tab within seconds
@@ -28,17 +28,19 @@ in **your** Google Drive.
 2. Delete the placeholder `function myFunction() { ... }`.
 3. Open the file `Code.gs` from this project (sits next to `index.html`),
    select everything, copy, paste it into the Apps Script editor.
-4. Click the disk icon to save (Ctrl/Cmd+S). Name the project
+4. Click **+ → HTML**, name it `AdminDialog`, then copy the contents of
+   `AdminDialog.html` from this project into that file.
+5. Click the disk icon to save (Ctrl/Cmd+S). Name the project
    `Herdsmanship Backend` if it asks.
-5. In the function dropdown at the top, pick **setupTabs**, then click
+6. In the function dropdown at the top, pick **setupTabs**, then click
    **Run**. The first run will pop up an authorization screen — click
    **Review permissions** → pick your Google account → **Advanced** →
    **Go to Herdsmanship Backend (unsafe)** → **Allow**. (This is the
    normal Google warning for any script you wrote yourself.)
-6. Go back to the sheet — you should now see the 10 tabs filled with
+7. Go back to the sheet — you should now see the 10 tabs filled with
    the Woodbury clubs, barns, stalls, barn layout, rubric, etc.
-7. Reload the Sheet once. A **Herdsmanship Admin** menu appears for owner/editor-only
-   shared-score resets. The public Web App endpoint cannot perform this destructive action.
+8. Reload the Sheet once. A **Herdsmanship Admin** menu appears. Global Setup-lock
+   controls are shown only to the spreadsheet owner; shared-score reset remains a Sheet action.
 
 ## Step 3 — Deploy as a Web App
 
@@ -52,36 +54,34 @@ in **your** Google Drive.
 5. Copy the **Web app URL** (looks like
    `https://script.google.com/macros/s/AKfyc...../exec`).
 
-> The "Anyone" setting only means anyone with this exact URL can
-> POST scores into your sheet. It does not list it publicly. Treat
-> the URL like a password — anyone with it can write to your sheet.
-> If it ever leaks, just go back to Deploy → Manage deployments and
-> create a new deployment (the URL changes).
+> The "Anyone" setting is required for judge phones that are not signed into the
+> owner's Google account. The production endpoint is embedded in the PWA and is not
+> treated as a secret; the backend validates dataset identity, score generation,
+> revisions, operation IDs, judges, clubs, species, ratings, and notes before writing.
 
-## Step 4 — Paste the URL into the PWA
+## Step 4 — Verify automatic phone sync
 
 1. Open the PWA: https://kingofrandom.github.io/herdsmanship-demo/
-2. Tap **Setup** (bottom right).
-3. Scroll to **Cloud sync · Google Sheet**.
-4. Paste the URL into the field.
-5. Tap **Save URL** — it auto-pulls the current configuration, shared scores,
-   schedule, protected dataset identity, and score generation. The badge should change
-   to **✓ Synced** and Last sync should show the current time.
-6. Repeat step 1–5 on every judge's phone. They all paste the same URL.
+2. Leave it open online for a few seconds. It automatically pulls the current
+   configuration, shared scores, schedule, protected dataset identity, and score generation.
+3. Tap **Setup** (bottom right), scroll to **Cloud sync · Google Sheet**, and confirm
+   the badge shows **✓ Synced**, **Queued (unsynced)** is `0`, and **Needs review** is `0`.
+4. Repeat on every judge's phone. No URL entry is required. The app also refreshes
+   when opened, when connectivity returns, and when it returns to the foreground.
 
-### Optional — protect Setup with a PIN
+### Optional — protect Setup globally
 
-After Cloud Sync shows **✓ Synced**, each phone can protect its Setup screen:
+The spreadsheet owner can protect Setup on every synced device at once:
 
-1. In **Setup**, find **Setup protection**.
-2. Tap **Set PIN** and enter the same 4–8 digit PIN twice.
-3. Leave Setup. The app will require the PIN the next time anyone taps Setup,
-   the judge chip, or the inspection chip. It also re-locks when the app is hidden.
+1. Reload the Google Sheet so **Herdsmanship Admin** appears.
+2. Choose **Herdsmanship Admin → Set/change global Setup password…**.
+3. Enter and confirm a 10–64 character administrator password.
+4. Refresh each judge phone once while online. Opening Setup now requires that password.
 
-The PIN applies only to that browser/device and is not synced through Google Sheets,
-so repeat these steps on every judge phone you want protected. The app stores a salted
-hash rather than the readable PIN. This is an accidental-change guard, not a replacement
-for the owner-only score reset and Sheet permissions.
+Only the spreadsheet owner can set, change, or turn off the lock. The readable password
+is never stored; Apps Script keeps only a salted hash in protected Script Properties.
+Phones receive only the shared enabled/revision state and verify access online. To remove
+protection everywhere, use **Herdsmanship Admin → Turn off global Setup lock…**.
 
 ## Step 5 — Hand off to Jamie
 
@@ -158,8 +158,8 @@ To add a new club/addition and assign pens:
    - `Pen Count` — number shown on the app's pen badge
    - `Stalls Used` — stall/pen range assigned to this club, e.g. `A10–A12`
    - `Location Notes` — optional aisle/wall description
-3. On each judge phone, open the PWA and tap **Setup → Sync now**
-   or force-close/reopen the app. The new barn, stall inventory, club,
+3. On each judge phone, reopen or return to the PWA. It syncs automatically;
+   **Setup → Sync now** remains available as a manual refresh. The new barn, stall inventory, club,
    and pen assignment should appear under the selected species.
 
 Example Barn Layout rows:
@@ -171,9 +171,9 @@ Example Barn Layout rows:
 
 ## Troubleshooting
 
-- **"⚠ Could not reach sheet"** when tapping Sync now → the URL is
-  wrong, the deployment was deleted, or your phone is offline.
-  Check the URL by pasting it into a browser — you should see
+- **"⚠ Could not complete sync"** → the deployment may be unavailable or the phone
+  may be offline. Check the production Apps Script URL in Setup by opening it in a browser;
+  you should see
   `{"ok":true,"config":...}`.
 - **Edits to the sheet not showing up in the PWA** → Pull happens on
   app launch and on tap of "Sync now". Have the judge force-close
@@ -191,14 +191,13 @@ Example Barn Layout rows:
 - **Needs review is nonzero** → tap the row to see why an operation was quarantined
   (wrong Sheet, stale reset generation, record conflict, or invalid data) and copy the
   preserved recovery details. After reviewing/copying, use **Discard reviewed local changes**
-  to clear the recovery list before changing the backend URL or re-entering the score.
+  to clear the recovery list before re-entering the score.
 - **“⚠ Sync issue” after updating the PWA** → deploy the latest `Code.gs` as a new
   Apps Script version. The updated client intentionally refuses the old whole-sheet
   snapshot protocol.
-- **Forgot the Setup PIN** → there is intentionally no readable or cloud-recoverable PIN.
-  First confirm that the phone shows no queued unsynced work. Clearing this site's browser
-  data removes the lock, but it also removes local-only state and the saved sync URL; reopen
-  the app, paste the Web App URL again, sync, and set a new PIN.
+- **Forgot the Setup password** → the readable password cannot be recovered. The spreadsheet
+  owner can use **Herdsmanship Admin → Set/change global Setup password…** to replace it, or
+  **Turn off global Setup lock…** to remove protection. Refresh phones while online afterward.
 
 ## Re-deploying after editing Code.gs
 

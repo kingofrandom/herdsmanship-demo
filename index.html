@@ -192,9 +192,6 @@
   .sample-banner{background:#e9f0ff;color:#244b8f;border-bottom-color:#c8d8f4;display:flex;align-items:center;justify-content:center;gap:9px;padding:7px 10px;}
   .sample-banner button{border:1px solid #8da9d8;background:#fff;color:#244b8f;border-radius:999px;padding:4px 9px;font-weight:700;font-size:11px;}
   .lock-status{font-size:12px;color:var(--muted);margin-top:3px;line-height:1.35;}
-  .lock-actions{display:flex;align-items:center;justify-content:flex-end;gap:7px;flex-wrap:wrap;}
-  .lock-action{border:1px solid var(--line);background:#fff;color:var(--green-d);border-radius:9px;padding:8px 11px;font-weight:750;font-size:12.5px;cursor:pointer;}
-  .lock-action.danger{color:var(--danger);}
   .modal-backdrop{position:fixed;inset:0;background:rgba(10,22,15,.58);z-index:80;display:none;align-items:center;justify-content:center;padding:20px;}
   .modal-backdrop.open{display:flex;}
   .lock-modal{width:min(100%,390px);background:#fff;border-radius:18px;padding:20px;box-shadow:0 18px 60px rgba(0,0,0,.32);}
@@ -322,17 +319,13 @@
         <div class="row"><span class="lab">Inspection</span>
           <div class="seg" id="passSeg"></div></div>
       </div>
-      <h2 class="sec"><span>Setup protection</span><span class="right" id="setupLockBadge">Off</span></h2>
+      <h2 class="sec"><span>Setup protection</span><span class="right" id="setupLockBadge">Checking…</span></h2>
       <div class="panel">
         <div class="row">
-          <div><div class="lab">Protect Setup on this device</div><div class="lock-status" id="setupLockStatus">Anyone can open and change Setup.</div></div>
-          <div class="lock-actions">
-            <button class="lock-action" id="setupLockAction" onclick="beginSetupLockChange()">Set PIN</button>
-            <button class="lock-action danger" id="setupLockDisable" style="display:none" onclick="beginDisableSetupLock()">Turn off</button>
-          </div>
+          <div><div class="lab">Global Setup lock</div><div class="lock-status" id="setupLockStatus">Checking the shared lock state…</div></div>
         </div>
       </div>
-      <div class="hint">Optional 4–8 digit PIN. The lock applies only to this browser/device and prevents accidental Setup changes. It does not replace the owner-only controls in Google Sheets.</div>
+      <div class="hint">Managed by the Google Sheet owner for every synced device. Only the owner can set, change, or turn off the administrator password.</div>
 
       <h2 class="sec"><span>Rubric · 100 pts</span><span class="right">Woodbury 2026</span></h2>
       <div class="panel" id="rubricPanel"></div>
@@ -341,20 +334,17 @@
       <h2 class="sec"><span>Cloud sync · Google Sheet</span><span class="right" id="syncBadge">Not configured</span></h2>
       <div class="panel">
         <div class="row" style="flex-direction:column; align-items:stretch; gap:8px;">
-          <span class="lab">Apps Script Web App URL</span>
-          <input id="syncUrl" type="url" placeholder="https://script.google.com/macros/s/…/exec"
-            style="width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:10px;font:inherit;font-size:14px;background:#fff;" />
-          <div style="display:flex;gap:8px;">
-            <button class="btn ghost" style="flex:1;height:46px;font-size:15px;" onclick="saveSyncUrl()">Save URL</button>
-            <button class="btn primary" style="flex:1;height:46px;font-size:15px;" onclick="syncNow()">Sync now</button>
-          </div>
+          <span class="lab">Production Apps Script Web App</span>
+          <input id="syncUrl" type="url" readonly aria-readonly="true"
+            style="width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:10px;font:inherit;font-size:13px;background:var(--bg);color:var(--muted);" />
+          <button class="btn primary" style="height:46px;font-size:15px;" onclick="syncNow()">Sync now</button>
         </div>
         <div class="row"><span class="lab">Last sync</span><span class="val" id="lastSyncTxt">Never</span></div>
         <div class="row"><span class="lab">Queued (unsynced)</span><span class="val" id="queuedTxt">0</span></div>
         <div class="row" onclick="showRecovery()"><span class="lab">Needs review <small style="color:var(--muted)">(tap for details)</small></span><span class="val" id="recoveryTxt">0</span></div>
         <div class="row" id="recoveryClearRow" style="display:none;" onclick="clearRecovery()"><span class="lab" style="color:var(--danger)">Discard reviewed local changes</span><span class="val">×</span></div>
       </div>
-      <div class="hint">One-time setup: in your Google Drive, create a sheet → Extensions → Apps Script → paste the code from SETUP.md → Deploy as Web App → paste the URL here. Scores sync to the sheet when online; held locally when offline and retried on the next save.</div>
+      <div class="hint">Every judge phone connects to the production Google Sheet automatically. The app refreshes shared configuration, scores, schedule, and Setup protection when it opens or returns online; offline changes remain queued and retry safely.</div>
 
       <h2 class="sec"><span>Sheet-managed fair layout</span></h2>
       <div class="panel">
@@ -391,14 +381,10 @@
         <h2 id="setupLockTitle">Setup is locked</h2>
         <button class="modal-close" type="button" onclick="closeSetupLockModal()" aria-label="Close">×</button>
       </div>
-      <p class="lock-modal-copy" id="setupLockCopy">Enter the PIN to change this device's Setup.</p>
+      <p class="lock-modal-copy" id="setupLockCopy">Enter the administrator password to change Setup.</p>
       <form onsubmit="submitSetupLock(event)">
-        <label class="pin-label" for="setupPin">PIN</label>
-        <input class="pin-input" id="setupPin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8" autocomplete="off" aria-describedby="setupPinError">
-        <div id="setupPinConfirmWrap" style="display:none">
-          <label class="pin-label" for="setupPinConfirm">Confirm PIN</label>
-          <input class="pin-input" id="setupPinConfirm" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8" autocomplete="off">
-        </div>
+        <label class="pin-label" for="setupPassword">Administrator password</label>
+        <input class="pin-input" id="setupPassword" type="password" maxlength="64" autocomplete="current-password" aria-describedby="setupPinError">
         <div class="pin-error" id="setupPinError" aria-live="polite"></div>
         <div class="modal-actions">
           <button class="btn ghost" type="button" onclick="closeSetupLockModal()">Cancel</button>
@@ -519,14 +505,14 @@ const BARN_LAYOUT = [
 ];
 
 const LS="hsm_woodbury_v3";
-const SETUP_LOCK_LS = "hsm_setup_lock_v1";
+const SETUP_PROTECTION_LS = "hsm_setup_protection_v1";
+const LEGACY_SETUP_LOCK_LS = "hsm_setup_lock_v1";
 let S = load();
 let activeSpecies = "beef";
 let currentClub = null, currentSpecies = null;
 let draft = {};
 let resultsMode = "overall";
 let setupUnlocked = false;
-let setupLockMode = "unlock";
 
 function emptyState(){
   return {mode:"live", judge:"Pat M.", pass:"d2pm", scores:{}, schedule:{}};
@@ -583,61 +569,36 @@ function createSampleState(){
 function saveLocal(){ localStorage.setItem(LS, JSON.stringify(S)); flashSaved(); }
 function save(){ saveLocal(); }
 
-// ============ OPTIONAL PER-DEVICE SETUP LOCK ============
-function setupLockState(){
+// ============ SHEET-OWNER-MANAGED GLOBAL SETUP LOCK ============
+function setupProtectionState(){
   try {
-    const state=JSON.parse(localStorage.getItem(SETUP_LOCK_LS));
-    return state && state.salt && state.hash ? state : null;
-  } catch(e){ return null; }
+    const state=JSON.parse(localStorage.getItem(SETUP_PROTECTION_LS));
+    if(state && typeof state.enabled==='boolean' && Number.isInteger(state.revision)) return state;
+  } catch(e){}
+  return {enabled:false,revision:0};
 }
-function isSetupLockEnabled(){ return !!setupLockState(); }
-function setupPinValid(pin){ return /^\d{4,8}$/.test(String(pin||'')); }
-function bytesToHex(bytes){ return Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join(''); }
-async function hashSetupPin(pin, salt){
-  const input=new TextEncoder().encode(`${salt}:${pin}`);
-  const digest=await crypto.subtle.digest('SHA-256', input);
-  return bytesToHex(new Uint8Array(digest));
-}
-async function saveSetupPin(pin){
-  if(!setupPinValid(pin)) throw new Error('invalid_pin');
-  const saltBytes=new Uint8Array(16); crypto.getRandomValues(saltBytes);
-  const salt=bytesToHex(saltBytes);
-  const hash=await hashSetupPin(pin,salt);
-  localStorage.setItem(SETUP_LOCK_LS,JSON.stringify({version:1,salt,hash}));
-}
-async function verifySetupPin(pin){
-  const state=setupLockState();
-  if(!state || !setupPinValid(pin)) return false;
-  const actual=await hashSetupPin(pin,state.salt);
-  if(actual.length!==state.hash.length) return false;
-  let different=0;
-  for(let i=0;i<actual.length;i++) different|=actual.charCodeAt(i)^state.hash.charCodeAt(i);
-  return different===0;
+function isSetupLockEnabled(){ return setupProtectionState().enabled; }
+function applySetupProtection(remote){
+  if(!remote || typeof remote.enabled!=='boolean') return;
+  const next={enabled:remote.enabled,revision:Number(remote.revision)||0};
+  const current=setupProtectionState();
+  if(current.enabled!==next.enabled || current.revision!==next.revision) setupUnlocked=false;
+  localStorage.setItem(SETUP_PROTECTION_LS,JSON.stringify(next));
+  localStorage.removeItem(LEGACY_SETUP_LOCK_LS);
+  renderSetupLockControls();
+  const setupView=document.getElementById('view-setup');
+  if(next.enabled && !setupUnlocked && setupView && setupView.classList.contains('active')) go('score');
 }
 function setSetupLockError(message){
   const el=document.getElementById('setupPinError'); if(el) el.textContent=message||'';
 }
-function openSetupLockModal(mode='unlock'){
-  setupLockMode=mode;
+function openSetupLockModal(){
   const modal=document.getElementById('setupLockModal');
-  const title=document.getElementById('setupLockTitle');
-  const copy=document.getElementById('setupLockCopy');
-  const submit=document.getElementById('setupLockSubmit');
-  const confirmWrap=document.getElementById('setupPinConfirmWrap');
-  const pin=document.getElementById('setupPin');
-  const pinConfirm=document.getElementById('setupPinConfirm');
-  const config={
-    unlock:['Setup is locked',"Enter the PIN to change this device's Setup.",'Unlock'],
-    create:['Create Setup PIN','Choose a 4–8 digit PIN for this browser/device.','Protect Setup'],
-    change:['Change Setup PIN','Enter the current PIN first.','Continue'],
-    disable:['Turn off Setup lock','Enter the current PIN to remove protection.','Turn off lock'],
-  }[mode] || null;
-  if(!modal || !config) return;
-  title.textContent=config[0]; copy.textContent=config[1]; submit.textContent=config[2];
-  confirmWrap.style.display=mode==='create'?'block':'none';
-  pin.value=''; pinConfirm.value=''; setSetupLockError('');
+  const password=document.getElementById('setupPassword');
+  if(!modal) return;
+  password.value=''; setSetupLockError('');
   modal.classList.add('open'); modal.setAttribute('aria-hidden','false');
-  setTimeout(()=>pin.focus(),50);
+  setTimeout(()=>password.focus(),50);
 }
 function closeSetupLockModal(){
   const modal=document.getElementById('setupLockModal');
@@ -645,54 +606,76 @@ function closeSetupLockModal(){
   modal.classList.remove('open'); modal.setAttribute('aria-hidden','true');
   setSetupLockError('');
 }
-function beginSetupLockChange(){ openSetupLockModal(isSetupLockEnabled()?'change':'create'); }
-function beginDisableSetupLock(){ openSetupLockModal('disable'); }
+async function verifySetupAccess(password){
+  const st=syncState();
+  if(!st.url) throw new Error('sync_not_configured');
+  const result=await postSync(st.url,{action:'verifySetupAccess',password:String(password||'')});
+  if(result.setupProtection) applySetupProtection(result.setupProtection);
+  return !!(result.ok && result.unlocked);
+}
 async function submitSetupLock(event){
   event.preventDefault();
-  const pin=document.getElementById('setupPin').value.trim();
-  const confirmPin=document.getElementById('setupPinConfirm').value.trim();
+  const password=document.getElementById('setupPassword').value;
+  const submit=document.getElementById('setupLockSubmit');
   setSetupLockError('');
+  if(!password){ setSetupLockError('Enter the administrator password.'); return; }
+  submit.disabled=true; submit.textContent='Checking…';
   try {
-    if(setupLockMode==='create'){
-      if(!setupPinValid(pin)){ setSetupLockError('Use a 4–8 digit PIN.'); return; }
-      if(pin!==confirmPin){ setSetupLockError('The PINs do not match.'); return; }
-      await saveSetupPin(pin); setupUnlocked=true; closeSetupLockModal();
-      renderSetupLockControls(); toast('🔒 Setup PIN enabled on this device'); return;
-    }
-    if(!(await verifySetupPin(pin))){ setSetupLockError('Incorrect PIN.'); return; }
-    if(setupLockMode==='unlock'){
-      setupUnlocked=true; closeSetupLockModal(); go('setup'); return;
-    }
-    if(setupLockMode==='change'){ openSetupLockModal('create'); return; }
-    if(setupLockMode==='disable'){
-      localStorage.removeItem(SETUP_LOCK_LS); setupUnlocked=true; closeSetupLockModal();
-      renderSetupLockControls(); toast('🔓 Setup lock turned off');
-    }
-  } catch(e){ setSetupLockError('Could not update the Setup PIN on this device.'); }
+    if(!(await verifySetupAccess(password))){ setSetupLockError('Incorrect administrator password.'); return; }
+    setupUnlocked=true; closeSetupLockModal(); go('setup');
+  } catch(e){ setSetupLockError('Connect to the internet to verify the administrator password.'); }
+  finally { submit.disabled=false; submit.textContent='Unlock'; }
 }
 function renderSetupLockControls(){
   const enabled=isSetupLockEnabled();
   const badge=document.getElementById('setupLockBadge'); if(badge) badge.textContent=enabled?'🔒 On':'Off';
   const status=document.getElementById('setupLockStatus');
-  if(status) status.textContent=enabled?'PIN required whenever Setup is opened.':'Anyone can open and change Setup.';
-  const action=document.getElementById('setupLockAction'); if(action) action.textContent=enabled?'Change PIN':'Set PIN';
-  const disable=document.getElementById('setupLockDisable'); if(disable) disable.style.display=enabled?'inline-block':'none';
+  if(status) status.textContent=enabled?'Administrator password required on every synced device.':'Global Setup protection is currently off.';
 }
 if(document.addEventListener){
-  document.addEventListener('visibilitychange',()=>{ if(document.hidden) setupUnlocked=false; });
+  document.addEventListener('visibilitychange',()=>{
+    if(document.hidden){ setupUnlocked=false; return; }
+    if(!isSampleMode() && navigator.onLine) syncNow();
+  });
   document.addEventListener('keydown',event=>{ if(event.key==='Escape') closeSetupLockModal(); });
 }
 
 // ============ CLOUD SYNC (Google Sheet via Apps Script) ============
+const PRODUCTION_SYNC_URL = "https://script.google.com/macros/s/AKfycbyfBeDlcDCXcU10eZYv4AcaC8pBzDIHd18_biw267idcPJl_ORQxX4d56rNnAwEU5j7/exec";
 const SYNC_LS = "hsm_sync_v2";
 const LEGACY_SYNC_LS = "hsm_sync_v1";
 let pushPromise = null;
+let syncPromise = null;
 
 function defaultSyncState(){
-  return {url:"", lastSync:0, queue:[], recovery:[], datasetId:null, generation:null, lastError:""};
+  return {url:PRODUCTION_SYNC_URL, lastSync:0, queue:[], recovery:[], datasetId:null, generation:null, lastError:""};
 }
 function canonicalSyncUrl(value){
   return String(value||'').trim().replace(/[?#].*$/,'').replace(/\/$/,'');
+}
+function bindProductionSync(st){
+  const previousUrl=canonicalSyncUrl(st.url);
+  let changed=previousUrl!==PRODUCTION_SYNC_URL;
+  st.url=PRODUCTION_SYNC_URL;
+  if(changed){
+    st.datasetId=null; st.generation=null; st.lastSync=0; st.lastError="";
+  }
+  const retained=[];
+  st.queue.forEach(item=>{
+    const backendUrl=canonicalSyncUrl(item.backendUrl);
+    if(!backendUrl && item.datasetId==null && item.generation==null){
+      item.backendUrl=PRODUCTION_SYNC_URL;
+      retained.push(item); changed=true;
+    } else if(backendUrl!==PRODUCTION_SYNC_URL){
+      st.recovery.push({...item,recoveryReason:'production_endpoint_changed',recoveredAt:Date.now()});
+      changed=true;
+    } else {
+      item.backendUrl=PRODUCTION_SYNC_URL;
+      retained.push(item);
+    }
+  });
+  st.queue=retained;
+  return changed;
 }
 function syncState(){
   try {
@@ -704,12 +687,14 @@ function syncState(){
       const obsolete = st.queue.filter(item=>!item.opId);
       st.queue = st.queue.filter(item=>item.opId);
       obsolete.forEach(item=>st.recovery.push({...item, recoveryReason:'client_upgrade_required'}));
-      st.url = canonicalSyncUrl(st.url);
-      if(obsolete.length) saveSyncState(st);
+      const previousUrl=st.url;
+      const changed=bindProductionSync(st) || obsolete.length>0 || st.url!==previousUrl;
+      if(changed) saveSyncState(st);
       return st;
     }
     const legacy = JSON.parse(localStorage.getItem(LEGACY_SYNC_LS));
-    const migrated = {...defaultSyncState(), url:canonicalSyncUrl(legacy && legacy.url)};
+    const migrated = {...defaultSyncState(), url:canonicalSyncUrl(legacy && legacy.url) || PRODUCTION_SYNC_URL};
+    bindProductionSync(migrated);
     saveSyncState(migrated);
     return migrated;
   } catch(e){ return defaultSyncState(); }
@@ -722,25 +707,6 @@ function newOpId(){
   return `${Date.now().toString(36)}${Math.random().toString(36).slice(2)}${Math.random().toString(36).slice(2)}`;
 }
 function isSampleMode(){ return S.mode==='sample'; }
-function saveSyncUrl(){
-  const input = document.getElementById('syncUrl');
-  const url = canonicalSyncUrl(input.value);
-  const st = syncState();
-  const firstBinding = !st.url && !!url && !st.recovery.length && st.queue.every(item=>!item.backendUrl);
-  if(url!==st.url && (st.queue.length || st.recovery.length) && !firstBinding){
-    input.value=st.url;
-    toast('⚠ Resolve queued/recovery items before changing the Sheet URL');
-    return;
-  }
-  if(url!==st.url){
-    if(firstBinding) st.queue.forEach(item=>{ item.backendUrl=url; });
-    st.url=url; st.datasetId=null; st.generation=null; st.lastSync=0; st.lastError="";
-  }
-  saveSyncState(st);
-  toast(url ? '✓ Sync URL saved' : '↺ Sync URL cleared');
-  renderSyncPanel();
-  if(url && !isSampleMode()) syncNow();
-}
 function queueScoreUpsert(key, entry){
   if(isSampleMode()) return;
   const st = syncState();
@@ -766,19 +732,31 @@ function recoverItem(st, item, reason){
   st.queue = st.queue.filter(x=>x.opId!==item.opId);
   st.recovery.push({...item, recoveryReason:reason, recoveredAt:Date.now()});
 }
+async function requestJson(url, options){
+  let lastError;
+  for(let attempt=0; attempt<2; attempt++){
+    try {
+      const response=await fetch(url, options);
+      if(response.ok===false) throw new Error(`http_${response.status || 'error'}`);
+      return await response.json();
+    } catch(err){
+      lastError=err;
+      if(attempt===0) await new Promise(resolve=>setTimeout(resolve,350));
+    }
+  }
+  throw lastError;
+}
 async function postSync(url, body){
-  const response = await fetch(url, {
+  return requestJson(url, {
     method:'POST', mode:'cors',
     headers:{'Content-Type':'text/plain;charset=utf-8'},
     body:JSON.stringify(body)
   });
-  return response.json();
 }
 async function pullRemoteState(){
   const st = syncState();
   if(!st.url) return null;
-  const response = await fetch(st.url + '?action=state', {method:'GET'});
-  const result = await response.json();
+  const result = await requestJson(st.url + '?action=state', {method:'GET'});
   if(!result || !result.ok || !result.state || !result.state.datasetId){
     throw new Error('backend_update_required');
   }
@@ -885,31 +863,44 @@ function pushQueue(){
   pushPromise = pushPromise.finally(()=>{ pushPromise=null; });
   return pushPromise;
 }
-async function syncNow(){
+function syncNow(){
   const st = syncState();
-  if(isSampleMode()){ toast('🧪 Return to live data before syncing'); return; }
-  if(!st.url){ toast('⚠ Add the Apps Script URL first'); return; }
-  try {
-    const cfgResponse = await fetch(st.url + '?action=config', {method:'GET'});
-    const cfg = await cfgResponse.json();
-    if(cfg && cfg.ok && cfg.config) applyRemoteConfig(cfg.config);
-    else throw new Error('config_failed');
-    await pullRemoteState();
-    await pushQueue();
-    const afterPush = syncState();
-    if(afterPush.lastError && !afterPush.recovery.length) throw new Error(afterPush.lastError);
-    if(!afterPush.queue.length) await pullRemoteState();
-    toast(afterPush.recovery.length
-      ? '⚠ Synced; some local changes need review'
-      : '✓ Config and shared scores synced');
-  } catch(err){
-    const failed = syncState();
-    failed.lastError = err && err.message ? err.message : 'sync_failed';
-    saveSyncState(failed); renderSyncPanel();
-    toast(failed.lastError==='backend_update_required'
-      ? '⚠ Apps Script backend must be updated'
-      : '⚠ Could not complete sync');
-  }
+  if(isSampleMode()){ toast('🧪 Return to live data before syncing'); return Promise.resolve(); }
+  if(!st.url){ toast('⚠ Sync endpoint is unavailable'); return Promise.resolve(); }
+  if(syncPromise) return syncPromise;
+  syncPromise=(async()=>{
+    const hadQueue=syncState().queue.length>0;
+    try {
+      const cfg = await requestJson(st.url + '?action=config', {method:'GET'});
+      if(cfg && cfg.ok && cfg.config) applyRemoteConfig(cfg.config);
+      else throw new Error('config_failed');
+      await pullRemoteState();
+      await pushQueue();
+      const afterPush = syncState();
+      if(afterPush.lastError && !afterPush.recovery.length) throw new Error(afterPush.lastError);
+      if(hadQueue && !afterPush.queue.length) await pullRemoteState();
+      toast(afterPush.recovery.length
+        ? '⚠ Synced; some local changes need review'
+        : '✓ Config and shared scores synced');
+    } catch(err){
+      const failed = syncState();
+      failed.lastError = err && err.message ? err.message : 'sync_failed';
+      saveSyncState(failed); renderSyncPanel();
+      toast(failed.lastError==='backend_update_required'
+        ? '⚠ Apps Script backend must be updated'
+        : '⚠ Could not complete sync');
+    }
+  })().finally(()=>{ syncPromise=null; });
+  return syncPromise;
+}
+async function refreshSetupProtection(){
+  const st=syncState();
+  if(!st.url) return setupProtectionState();
+  const payload=await requestJson(st.url+'?action=config',{method:'GET'});
+  if(!payload || !payload.ok || !payload.config) throw new Error('config_failed');
+  if(!payload.config.setupProtection) throw new Error('backend_update_required');
+  applySetupProtection(payload.config.setupProtection);
+  return setupProtectionState();
 }
 function restoreSampleData(){
   if(!confirm('Replace the display on this device with local-only sample data?')) return;
@@ -924,6 +915,9 @@ async function exitSampleMode(){
   else toast('✓ Returned to empty live data');
 }
 function applyRemoteConfig(cfg){
+  if(!cfg.setupProtection || typeof cfg.setupProtection.enabled!=='boolean'){
+    throw new Error('backend_update_required');
+  }
   const species = Array.isArray(cfg.species) ? cfg.species : [];
   const speciesIds = species.map(item=>String(item.id||''));
   if(!species.length || new Set(speciesIds).size!==speciesIds.length ||
@@ -955,6 +949,7 @@ function applyRemoteConfig(cfg){
   if(Array.isArray(cfg.rubric) && cfg.rubric.length){
     RUBRIC.length = 0; cfg.rubric.forEach(item=>RUBRIC.push(item));
   }
+  applySetupProtection(cfg.setupProtection);
   if(!known.has(activeSpecies) || !clubsForSpecies(activeSpecies).length){
     const first = SPECIES.find(item=>clubsForSpecies(item.id).length);
     activeSpecies = first ? first.id : SPECIES[0].id;
@@ -1003,6 +998,7 @@ function renderSyncPanel(){
 }
 window.addEventListener('online', ()=>{ if(!isSampleMode()) syncNow(); });
 setInterval(()=>{ if(!isSampleMode() && syncState().queue.length) pushQueue(); }, 30000);
+setInterval(()=>{ if(!isSampleMode() && syncState().url && navigator.onLine) refreshSetupProtection().catch(()=>{}); }, 60000);
 
 function calc(r){
   if(!r) return 0;
@@ -1034,10 +1030,20 @@ function clubPassTotal(clubId, passId){
 }
 function passLabel(id){ return PASSES.find(p=>p.id===id)?.label || id; }
 
-function go(v){
-  if(v==='setup' && isSetupLockEnabled() && !setupUnlocked){
-    openSetupLockModal('unlock');
-    return;
+async function go(v){
+  if(v==='setup' && !setupUnlocked){
+    if(syncState().url){
+      try { await refreshSetupProtection(); }
+      catch(e){
+        toast('⚠ Connect to verify Setup access');
+        if(isSetupLockEnabled()) openSetupLockModal();
+        return;
+      }
+    }
+    if(isSetupLockEnabled()){
+      openSetupLockModal();
+      return;
+    }
   }
   if(v!=='setup' && isSetupLockEnabled()) setupUnlocked=false;
   document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));

@@ -4,7 +4,7 @@
  * Paste this entire file into the Apps Script editor attached to
  * a Google Sheet in your Drive, then Deploy → New deployment →
  * "Web app" → Execute as: ME, Who has access: ANYONE.
- * Copy the Web App URL into the PWA's Setup → Cloud Sync field.
+ * The production PWA embeds this deployment URL so judge phones connect automatically.
  *
  * The script auto-creates these tabs on first call:
  *   Clubs, Barns, Stalls, Barn Layout, Judges, Rubric, Species, Settings, Scores, Schedule
@@ -30,6 +30,9 @@ const META = {
   INITIAL_BOUNDARY: 'HSM_INITIAL_BOUNDARY',
   RESET_PENDING_ID: 'HSM_RESET_PENDING_ID',
   LAST_RESET_ID: 'HSM_LAST_RESET_ID',
+  SETUP_LOCK_HASH: 'HSM_SETUP_LOCK_HASH',
+  SETUP_LOCK_SALT: 'HSM_SETUP_LOCK_SALT',
+  SETUP_LOCK_REVISION: 'HSM_SETUP_LOCK_REVISION',
 };
 const ID_RE = /^[a-z0-9_-]{1,50}$/;
 const PASS_RE = /^d[1-4](am|pm)$/;
@@ -59,17 +62,47 @@ function doPost(e) {
   }
   if (action === 'upsertScore') return json_(upsertScore_(body));
   if (action === 'upsertSchedule') return json_(upsertSchedule_(body));
+  if (action === 'verifySetupAccess') return json_(verifySetupAccess_(body));
   return json_({ok:false, error:'unknown_action'});
 }
 
-// Destructive shared resets are available only to a Sheet owner/editor through
-// this menu. They are intentionally not exposed by doPost().
+// Destructive shared resets and global Setup protection are available only to
+// the Sheet owner. They are intentionally not exposed by doPost().
 function onOpen() {
   SpreadsheetApp.getUi().createMenu('Herdsmanship Admin')
-    .addItem('Clear all scores…', 'resetAllScores').addToUi();
+    .addItem('Set/change global Setup password…', 'showSetupLockDialog')
+    .addItem('Turn off global Setup lock…', 'disableSetupLock')
+    .addSeparator()
+    .addItem('Clear all scores…', 'resetAllScores')
+    .addToUi();
+}
+
+function showSetupLockDialog() {
+  assertSheetOwner_();
+  const html = HtmlService.createHtmlOutputFromFile('AdminDialog')
+    .setWidth(420).setHeight(430);
+  SpreadsheetApp.getUi().showModalDialog(html, 'Global Setup protection');
+}
+
+function setSetupPasswordFromDialog(password) {
+  assertSheetOwner_();
+  return setSetupPassword_(password);
+}
+
+function disableSetupLock() {
+  assertSheetOwner_();
+  const ui = SpreadsheetApp.getUi();
+  const answer = ui.alert('Turn off Setup protection?',
+    'Setup will become editable on every synced device after its next refresh.',
+    ui.ButtonSet.YES_NO);
+  if (answer !== ui.Button.YES) return {ok:false, cancelled:true};
+  const result = disableSetupLock_();
+  ui.alert('Global Setup protection is off.');
+  return result;
 }
 
 function resetAllScores() {
+  assertSheetOwner_();
   ensureSheets_();
   const ui = SpreadsheetApp.getUi();
   const answer = ui.alert('Clear every Herdsmanship score?',
@@ -277,7 +310,8 @@ function readConfig_() {
   const settings = {};
   rows(TABS.SETTINGS).forEach(r => { if (r.Key) settings[String(r.Key)] = r.Value; });
 
-  return { clubs, barns, stalls, barnLayout, judges, rubric, species, settings };
+  return { clubs, barns, stalls, barnLayout, judges, rubric, species, settings,
+    setupProtection:readSetupProtection_() };
 }
 
 function readScores_() {
@@ -451,6 +485,85 @@ function scoreRow_(key, entry, rubric, revision, opId) {
   return [club, sp, pass, entry.judge, total,
     r.clean, r.animals, r.security, r.educ, r.feed, r.exhib,
     String(entry.note||''), new Date(), revision, opId];
+}
+
+// ---------- Global Setup protection ----------
+function isSheetOwner_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const owner = ss.getOwner && ss.getOwner();
+  const active = Session.getActiveUser && Session.getActiveUser();
+  const effective = Session.getEffectiveUser && Session.getEffectiveUser();
+  const ownerEmail = owner && owner.getEmail ? String(owner.getEmail()).toLowerCase() : '';
+  const activeEmail = active && active.getEmail ? String(active.getEmail()).toLowerCase() : '';
+  const effectiveEmail = effective && effective.getEmail ? String(effective.getEmail()).toLowerCase() : '';
+  return !!ownerEmail && (activeEmail || effectiveEmail) === ownerEmail;
+}
+
+function assertSheetOwner_() {
+  if (!isSheetOwner_()) throw new Error('Only the spreadsheet owner can manage global Setup protection.');
+}
+
+function readSetupProtection_() {
+  const props = PropertiesService.getScriptProperties();
+  const enabled = !!(props.getProperty(META.SETUP_LOCK_HASH) && props.getProperty(META.SETUP_LOCK_SALT));
+  const revision = Number(props.getProperty(META.SETUP_LOCK_REVISION));
+  return {enabled, revision:Number.isInteger(revision) && revision > 0 ? revision : 0};
+}
+
+function setSetupPassword_(password) {
+  const value = String(password || '');
+  if (value.length < 10 || value.length > 64 || value.trim() !== value || /[\u0000-\u001F\u007F]/.test(value)) {
+    throw new Error('Use a 10–64 character password without leading or trailing spaces.');
+  }
+  const props = PropertiesService.getScriptProperties();
+  const salt = `${Utilities.getUuid()}${Utilities.getUuid()}`.replace(/-/g, '');
+  const revision = readSetupProtection_().revision + 1;
+  props.setProperties({
+    [META.SETUP_LOCK_SALT]:salt,
+    [META.SETUP_LOCK_HASH]:setupPasswordHash_(value, salt),
+    [META.SETUP_LOCK_REVISION]:String(revision)
+  });
+  return {ok:true, setupProtection:{enabled:true, revision}};
+}
+
+function disableSetupLock_() {
+  const props = PropertiesService.getScriptProperties();
+  const revision = readSetupProtection_().revision + 1;
+  props.deleteProperty(META.SETUP_LOCK_HASH);
+  props.deleteProperty(META.SETUP_LOCK_SALT);
+  props.setProperty(META.SETUP_LOCK_REVISION, String(revision));
+  return {ok:true, setupProtection:{enabled:false, revision}};
+}
+
+function verifySetupAccess_(body) {
+  const protection = readSetupProtection_();
+  if (!protection.enabled) return {ok:true, unlocked:true, setupProtection:protection};
+  const password = String(body.password || '');
+  if (password.length < 10 || password.length > 64) {
+    return {ok:false, error:'incorrect_setup_password', setupProtection:protection};
+  }
+  const props = PropertiesService.getScriptProperties();
+  const expected = props.getProperty(META.SETUP_LOCK_HASH) || '';
+  const actual = setupPasswordHash_(password, props.getProperty(META.SETUP_LOCK_SALT) || '');
+  if (!constantTimeEqual_(actual, expected)) {
+    return {ok:false, error:'incorrect_setup_password', setupProtection:protection};
+  }
+  return {ok:true, unlocked:true, setupProtection:protection};
+}
+
+function setupPasswordHash_(password, salt) {
+  const digest = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,
+    `${salt}:${password}`, Utilities.Charset.UTF_8);
+  return digest.map(byte=>(byte + 256) % 256)
+    .map(byte=>byte.toString(16).padStart(2, '0')).join('');
+}
+
+function constantTimeEqual_(left, right) {
+  const a = String(left || ''), b = String(right || '');
+  let different = a.length ^ b.length;
+  const length = Math.max(a.length, b.length);
+  for (let i=0; i<length; i++) different |= (a.charCodeAt(i) || 0) ^ (b.charCodeAt(i) || 0);
+  return different === 0;
 }
 
 function resetAllScores_() {

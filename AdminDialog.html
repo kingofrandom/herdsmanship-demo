@@ -1,0 +1,44 @@
+<!doctype html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    *{box-sizing:border-box}body{margin:0;padding:24px;font:14px/1.45 Arial,sans-serif;color:#1f2937}
+    h1{font-size:20px;margin:0 0 8px}p{margin:0 0 18px;color:#5f6b7a}
+    label{display:block;font-weight:700;margin:14px 0 6px}input{width:100%;padding:11px 12px;border:1px solid #cbd5e1;border-radius:8px;font:inherit}
+    .hint{font-size:12px;color:#64748b;margin-top:6px}.error{min-height:20px;color:#b42318;margin-top:10px}
+    .actions{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}button{border:0;border-radius:8px;padding:10px 16px;font-weight:700;cursor:pointer}
+    .cancel{background:#eef2f7;color:#334155}.save{background:#2b51bd;color:white}.save:disabled{opacity:.55}
+  </style>
+</head>
+<body>
+  <h1>Protect Setup on every device</h1>
+  <p>Only the Google Sheet owner can set, change, or turn off this password. Judges will need it whenever they open Setup.</p>
+  <form id="form">
+    <label for="password">Administrator password</label>
+    <input id="password" type="password" minlength="10" maxlength="64" autocomplete="new-password" required autofocus>
+    <div class="hint">Use 10–64 characters. A multi-word passphrase is easiest to remember.</div>
+    <label for="confirm">Confirm password</label>
+    <input id="confirm" type="password" minlength="10" maxlength="64" autocomplete="new-password" required>
+    <div class="error" id="error" role="alert"></div>
+    <div class="actions">
+      <button class="cancel" type="button" onclick="google.script.host.close()">Cancel</button>
+      <button class="save" id="save" type="submit">Protect Setup</button>
+    </div>
+  </form>
+  <script>
+    const form=document.getElementById('form'), error=document.getElementById('error'), save=document.getElementById('save');
+    form.addEventListener('submit',event=>{
+      event.preventDefault(); error.textContent='';
+      const password=document.getElementById('password').value;
+      if(password!==document.getElementById('confirm').value){ error.textContent='The passwords do not match.'; return; }
+      if(password.length<10 || password.length>64 || password.trim()!==password){ error.textContent='Use 10–64 characters without leading or trailing spaces.'; return; }
+      save.disabled=true; save.textContent='Saving…';
+      google.script.run
+        .withSuccessHandler(()=>google.script.host.close())
+        .withFailureHandler(err=>{ error.textContent=(err&&err.message)||'Could not update Setup protection.'; save.disabled=false; save.textContent='Protect Setup'; })
+        .setSetupPasswordFromDialog(password);
+    });
+  </script>
+</body>
+</html>

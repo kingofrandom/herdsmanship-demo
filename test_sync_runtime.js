@@ -4,7 +4,7 @@
 const assert = require('assert');
 const fs = require('fs');
 const vm = require('vm');
-const {webcrypto} = require('crypto');
+const nodeCrypto = require('crypto');
 
 async function testFrontendRuntime() {
   const html = fs.readFileSync('index.html', 'utf8');
@@ -19,12 +19,12 @@ async function testFrontendRuntime() {
   ]);
   const elements = new Map();
   const element = id => {
-    if (!elements.has(id)) elements.set(id, {id, value:'', textContent:'', style:{}, classList:{add(){},remove(){},toggle(){}}});
+    if (!elements.has(id)) elements.set(id, {id, value:'', textContent:'', style:{}, classList:{add(){},remove(){},toggle(){},contains(){return false;}}});
     return elements.get(id);
   };
   const context = {
     console, assert,
-    setTimeout: () => 0, setInterval: () => 0, clearTimeout: () => {},
+    setTimeout: fn => { if (typeof fn === 'function') fn(); return 0; }, setInterval: () => 0, clearTimeout: () => {},
     localStorage: {
       getItem:key=>store.has(key)?store.get(key):null,
       setItem:(key,value)=>store.set(key,String(value)),
@@ -33,12 +33,7 @@ async function testFrontendRuntime() {
     navigator:{onLine:false},
     window:{addEventListener:()=>{},scrollTo:()=>{}},
     document:{getElementById:element},
-    crypto:{
-      subtle:webcrypto.subtle,
-      getRandomValues:array=>webcrypto.getRandomValues(array),
-      randomUUID:(()=>{let n=0;return()=>`00000000-0000-4000-8000-${String(++n).padStart(12,'0')}`;})(),
-    },
-    TextEncoder,
+    crypto:{randomUUID:(()=>{let n=0;return()=>`00000000-0000-4000-8000-${String(++n).padStart(12,'0')}`;})()},
     fetch:async()=>{throw new Error('unexpected network request');},
     confirm:()=>true,
     flashSaved:()=>{}, renderSyncPanel:()=>{}, renderScore:()=>{}, syncHeader:()=>{},
@@ -56,7 +51,7 @@ async function testFrontendRuntime() {
 
   const testCode = `${appCode}\n(async()=>{\n` +
     `assert.strictEqual(S.mode,'live'); assert.strictEqual(Object.keys(S.scores).length,0);\n` +
-    `let st=syncState(); assert.strictEqual(st.url,'https://example.invalid/exec'); assert.deepStrictEqual(st.queue,[]);\n` +
+    `let st=syncState(); assert.strictEqual(st.url,PRODUCTION_SYNC_URL); assert.deepStrictEqual(st.queue,[]);\n` +
     `const score=n=>({r:{clean:n,animals:5,security:5,educ:5,feed:5,exhib:5},note:'offline',judge:'Judge',revision:'rev0'});\n` +
     `S.mode='sample'; const before=syncState().queue.length; queueScoreUpsert('club|beef|d1am',score(3)); assert.strictEqual(syncState().queue.length,before,'sample score leaked to queue');\n` +
     `S.mode='live'; st=syncState(); st.url='https://example.invalid/exec'; st.datasetId=null; st.generation=null; st.queue=[]; st.recovery=[]; saveSyncState(st);\n` +
@@ -72,8 +67,15 @@ async function testFrontendRuntime() {
     `navigator.onLine=true; const pushing=pushQueue(); await Promise.resolve(); await Promise.resolve(); const second=score(5); S.scores['club|beef|d1am']=second; queueScoreUpsert('club|beef|d1am',second); resolveFirst(); await pushing;\n` +
     `assert.strictEqual(posts.length,2,'newer edit was deleted by older acknowledgement'); assert.strictEqual(posts[1].expectedRevision,'rev1'); assert.strictEqual(syncState().queue.length,0); assert.strictEqual(S.scores['club|beef|d1am'].revision,'rev2');\n` +
     `S=createSampleState(); const sampleCount=Object.keys(S.scores).length; assert(sampleCount>0); const queued=syncState().queue.length; queueScoreUpsert('club|beef|d1am',score(1)); assert.strictEqual(syncState().queue.length,queued);\n` +
-    `assert.strictEqual(isSetupLockEnabled(),false); await saveSetupPin('2468'); assert.strictEqual(isSetupLockEnabled(),true);\n` +
-    `const storedLock=localStorage.getItem(SETUP_LOCK_LS); assert(!storedLock.includes('2468'),'readable PIN was stored'); assert(await verifySetupPin('2468')); assert(!(await verifySetupPin('1357')));\n` +
+    `assert.strictEqual(isSetupLockEnabled(),false); applySetupProtection({enabled:true,revision:4}); assert.strictEqual(isSetupLockEnabled(),true);\n` +
+    `assert.strictEqual(setupProtectionState().revision,4); assert(!localStorage.getItem(SETUP_PROTECTION_LS).includes('password'));\n` +
+    `st=syncState(); st.url='https://example.invalid/exec'; saveSyncState(st); fetch=async(url,opts)=>{const body=JSON.parse(opts.body);assert.strictEqual(body.action,'verifySetupAccess');return {json:async()=>body.password==='correct horse battery staple'?{ok:true,unlocked:true,setupProtection:{enabled:true,revision:4}}:{ok:false,error:'incorrect_setup_password'}};};\n` +
+    `assert.strictEqual(await verifySetupAccess('wrong password'),false); assert.strictEqual(await verifySetupAccess('correct horse battery staple'),true);\n` +
+    `localStorage.removeItem(SYNC_LS); localStorage.removeItem(LEGACY_SYNC_LS); st=syncState(); assert.strictEqual(st.url,PRODUCTION_SYNC_URL,'fresh device did not receive production endpoint');\n` +
+    `st={...defaultSyncState(),url:'https://obsolete.invalid/exec',datasetId:'old-data',generation:1,queue:[{opId:'obsolete001',kind:'scoreUpsert',key:'club|beef|d1am',entry:score(3),backendUrl:'https://obsolete.invalid/exec',datasetId:'old-data',generation:1}],recovery:[]}; saveSyncState(st); st=syncState(); assert.strictEqual(st.url,PRODUCTION_SYNC_URL); assert.strictEqual(st.queue.length,0); assert(st.recovery.some(x=>x.recoveryReason==='production_endpoint_changed'),'wrong-backend operation was not quarantined');\n` +
+    `st={...defaultSyncState(),url:'',queue:[{opId:'offline001',kind:'scoreUpsert',key:'club|beef|d1am',entry:score(4),backendUrl:'',datasetId:null,generation:null}],recovery:[]}; saveSyncState(st); st=syncState(); assert.strictEqual(st.url,PRODUCTION_SYNC_URL); assert.strictEqual(st.queue[0].backendUrl,PRODUCTION_SYNC_URL,'unbound offline change was not attached safely');\n` +
+    `let attempts=0; fetch=async()=>({ok:true,json:async()=>{attempts++;if(attempts===1)throw new SyntaxError('html response');return {ok:true};}}); assert.strictEqual((await requestJson('https://example.invalid/retry')).ok,true); assert.strictEqual(attempts,2,'transient response was not retried');\n` +
+    `st={...defaultSyncState(),url:'https://example.invalid/exec',datasetId:'data-a',generation:2,queue:[],recovery:[]}; saveSyncState(st); S.mode='live'; let calls=[]; const config={setupProtection:{enabled:false,revision:0},species:SPECIES.map(x=>({...x})),clubs:CLUBS.map(x=>({...x,species:[...x.species]})),judges:[...JUDGES],barns:[],stalls:[],barnLayout:[],rubric:RUBRIC.map(x=>({...x}))}; fetch=async url=>{calls.push(url);return {ok:true,json:async()=>url.includes('action=config')?{ok:true,config}:{ok:true,state:{datasetId:'data-a',generation:2,scores:{},schedule:{}}}};}; await Promise.all([syncNow(),syncNow()]); assert.strictEqual(calls.filter(x=>x.includes('action=config')).length,1,'concurrent sync duplicated config request'); assert.strictEqual(calls.filter(x=>x.includes('action=state')).length,1,'empty queue caused duplicate state pulls');\n` +
     `return 'ok';\n})()`;
   const result = await vm.runInNewContext(testCode, context, {filename:'frontend-runtime.vm.js'});
   assert.strictEqual(result, 'ok');
@@ -127,7 +129,11 @@ function testBackendRuntime(){
     SpreadsheetApp:{getActiveSpreadsheet:()=>spreadsheet,getUi:()=>({createMenu(){return this;},addItem(){return this;},addToUi(){},alert(){return 'YES';},ButtonSet:{YES_NO:'YES_NO'},Button:{YES:'YES'}})},
     LockService:{getScriptLock:()=>({waitLock:()=>{},releaseLock:()=>{}})},
     PropertiesService:{getScriptProperties:()=>propApi},
-    Utilities:{getUuid:()=>`uuid-${String(++uuid).padStart(8,'0')}`},
+    Utilities:{
+      getUuid:()=>`uuid-${String(++uuid).padStart(8,'0')}`,
+      DigestAlgorithm:{SHA_256:'SHA_256'}, Charset:{UTF_8:'UTF_8'},
+      computeDigest:(algorithm,value)=>[...nodeCrypto.createHash('sha256').update(String(value)).digest()].map(n=>n>127?n-256:n),
+    },
     ContentService:{MimeType:{JSON:'JSON'},createTextOutput:text=>({text,setMimeType(){return this;}})},
   };
   vm.runInNewContext(fs.readFileSync('Code.gs','utf8'),context,{filename:'Code.gs'});
@@ -154,6 +160,20 @@ function testBackendRuntime(){
   state=get('state').state;
   assert.strictEqual(Object.keys(state.schedule).length,2,'per-slot schedule write lost another slot');
   assert.strictEqual(post({action:'updateSchedule'}).error,'client_upgrade_required');
+
+  let protection=get('config').config.setupProtection;
+  assert.deepStrictEqual(protection,{enabled:false,revision:0});
+  const password='correct horse battery staple';
+  const configured=context.setSetupPassword_(password);
+  assert(configured.ok && configured.setupProtection.enabled);
+  assert.strictEqual(post({action:'verifySetupAccess',password:'wrong password'}).error,'incorrect_setup_password');
+  assert.strictEqual(post({action:'verifySetupAccess',password}).unlocked,true);
+  assert.strictEqual(post({action:'setSetupPassword',password}).error,'unknown_action');
+  assert(![...properties.values()].includes(password),'backend stored the readable Setup password');
+  protection=get('config').config.setupProtection;
+  assert.strictEqual(protection.enabled,true); assert(protection.revision>0);
+  context.disableSetupLock_();
+  assert.strictEqual(get('config').config.setupProtection.enabled,false);
 
   const reset=context.resetAllScores_();
   assert.strictEqual(reset.generation,2); assert.strictEqual(reset.cleared,1);
